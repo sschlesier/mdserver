@@ -55,23 +55,7 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	// Handle root path
 	if requestPath == "/" {
-		// If a specific file is configured, serve it
-		if s.config.File != "" {
-			filePath := filepath.Join(s.config.RootDir, s.config.File)
-			if s.isValidPath(filePath) {
-				s.handleMarkdown(w, r, filePath)
-				return
-			}
-		}
-
-		// Check for default README.md
-		defaultFile := filepath.Join(s.config.RootDir, "README.md")
-		if s.isValidPath(defaultFile) {
-			s.handleMarkdown(w, r, defaultFile)
-			return
-		}
-
-		// Otherwise serve directory index
+		// Always serve directory index at root
 		s.handleIndex(w, r, s.config.RootDir)
 		return
 	}
@@ -187,4 +171,3 @@ func getContentType(ext string) string {
 		return "application/octet-stream"
 	}
 }
-
