@@ -316,7 +316,7 @@ func getDefaultTemplate() (*template.Template, error) {
 	<div class="container">
 		{{if .Breadcrumbs}}
 		<nav class="breadcrumbs">
-			{{range .Breadcrumbs}}<a href="{{.Href}}">{{.Text}}</a>{{end}}
+			{{range $index, $crumb := .Breadcrumbs}}{{if $index}}    {{end}}<a href="{{$crumb.Href}}">{{$crumb.Text}}</a>{{end}}
 		</nav>
 		{{end}}
 		{{.Content}}
@@ -339,7 +339,7 @@ func getDefaultDirectoryTemplate() (*template.Template, error) {
 <body>
 	<div class="container">
 		<nav class="breadcrumbs">
-			{{range .Breadcrumbs}}<a href="{{.Href}}">{{.Text}}</a>{{end}}
+			{{range $index, $crumb := .Breadcrumbs}}{{if $index}}    {{end}}<a href="{{$crumb.Href}}">{{$crumb.Text}}</a>{{end}}
 		</nav>
 		<h1>{{.Title}}</h1>
 		<ul class="directory-listing">
