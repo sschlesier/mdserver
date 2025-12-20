@@ -1,0 +1,125 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build:
+    name: Build binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: darwin
+            goarch: amd64
+            name: macos-amd64
+          - goos: darwin
+            goarch: arm64
+            name: macos-arm64
+          - goos: linux
+            goarch: amd64
+            name: linux-amd64
+          - goos: linux
+            goarch: arm64
+            name: linux-arm64
+          - goos: windows
+            goarch: amd64
+            name: windows-amd64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.5'
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          go build -ldflags="-s -w" -o mdserver${{ matrix.goos == 'windows' && '.exe' || '' }} .
+          mkdir -p release
+          mv mdserver${{ matrix.goos == 'windows' && '.exe' || '' }} release/mdserver-${{ matrix.name }}${{ matrix.goos == 'windows' && '.exe' || '' }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mdserver-${{ matrix.name }}
+          path: release/mdserver-${{ matrix.name }}${{ matrix.goos == 'windows' && '.exe' || '' }}
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release
+
+      - name: Generate checksums
+        run: |
+          cd release
+          sha256sum mdserver-* > checksums.txt
+
+      - name: Get tag name
+        id: tag
+        run: echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ steps.tag.outputs.TAG_NAME }}
+          body: |
+            ## mdserver ${{ steps.tag.outputs.TAG_NAME }}
+
+            ### Installation
+
+            **macOS (Homebrew):**
+            ```bash
+            brew install yourusername/mdserver/mdserver
+            ```
+
+            **macOS/Linux (manual):**
+            ```bash
+            # Download the appropriate binary
+            # macOS (Apple Silicon)
+            curl -L -o mdserver https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.TAG_NAME }}/mdserver-macos-arm64
+            chmod +x mdserver
+            sudo mv mdserver /usr/local/bin/
+
+            # macOS (Intel)
+            curl -L -o mdserver https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.TAG_NAME }}/mdserver-macos-amd64
+            chmod +x mdserver
+            sudo mv mdserver /usr/local/bin/
+
+            # Linux
+            curl -L -o mdserver https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.TAG_NAME }}/mdserver-linux-amd64
+            chmod +x mdserver
+            sudo mv mdserver /usr/local/bin/
+            ```
+
+            **Windows:**
+            Download `mdserver-windows-amd64.exe` and add it to your PATH.
+
+            ### Checksums
+            ```
+            ${{ github.workspace }}/release/checksums.txt
+            ```
+          files: |
+            release/*
+          draft: false
+          prerelease: ${{ contains(steps.tag.outputs.TAG_NAME, '-') }}
+
