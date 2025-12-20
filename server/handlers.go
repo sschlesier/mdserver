@@ -100,9 +100,27 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, dirPath str
 
 	// Build list of entries
 	var dirEntries []DirectoryEntry
+
+	// Check if we're at root directory (for parent directory link)
+	absDirPath, err := filepath.Abs(dirPath)
+	if err != nil {
+		absDirPath = dirPath
+	}
+	absRootDir, err := filepath.Abs(s.config.RootDir)
+	if err != nil {
+		absRootDir = s.config.RootDir
+	}
+	isAtRoot := absDirPath == absRootDir
+
 	for _, entry := range entries {
 		// Skip hidden files/directories
 		if strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+
+		// Only include directories or markdown files
+		isMarkdown := !entry.IsDir() && strings.HasSuffix(strings.ToLower(entry.Name()), ".md")
+		if !entry.IsDir() && !isMarkdown {
 			continue
 		}
 
@@ -124,14 +142,45 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, dirPath str
 			urlPath += "/"
 		}
 
-		isMarkdown := !entry.IsDir() && strings.HasSuffix(strings.ToLower(entry.Name()), ".md")
-
 		dirEntries = append(dirEntries, DirectoryEntry{
 			Name:       entry.Name(),
 			Path:       urlPath,
 			IsDir:      entry.IsDir(),
 			IsMarkdown: isMarkdown,
 		})
+	}
+
+	// Add parent directory entry if not at root
+	if !isAtRoot {
+		// Calculate parent directory path
+		parentDir := filepath.Dir(dirPath)
+		relParentPath, err := filepath.Rel(s.config.RootDir, parentDir)
+		if err == nil {
+			// Build URL path for parent directory using same logic as regular entries
+			relSlash := filepath.ToSlash(relParentPath)
+			parts := strings.Split(relSlash, "/")
+			encodedParts := make([]string, 0)
+			for _, part := range parts {
+				if part != "." && part != "" {
+					encodedParts = append(encodedParts, url.PathEscape(part))
+				}
+			}
+			var parentURLPath string
+			if len(encodedParts) == 0 {
+				parentURLPath = "/"
+			} else {
+				parentURLPath = "/" + strings.Join(encodedParts, "/") + "/"
+			}
+
+			// Prepend parent directory entry
+			parentEntry := DirectoryEntry{
+				Name:       "..",
+				Path:       parentURLPath,
+				IsDir:      true,
+				IsMarkdown: false,
+			}
+			dirEntries = append([]DirectoryEntry{parentEntry}, dirEntries...)
+		}
 	}
 
 	// Load directory template
