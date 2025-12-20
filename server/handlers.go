@@ -419,7 +419,7 @@ func extractTitle(content, filename string) string {
 
 // createBreadcrumbs generates breadcrumb navigation from a relative path
 // relPath should be relative to the root directory (e.g., "docs/subdir" or "docs/subdir/file.md")
-// For markdown files, it generates breadcrumbs for the containing directory
+// For markdown files, it generates breadcrumbs for the containing directory and includes the filename
 func createBreadcrumbs(relPath string) []Breadcrumb {
 	crumbs := []Breadcrumb{
 		{Href: "/", Text: "./"},
@@ -430,41 +430,66 @@ func createBreadcrumbs(relPath string) []Breadcrumb {
 		return crumbs
 	}
 
-	// For markdown files, get the directory path
-	dirPath := relPath
-	if filepath.Ext(relPath) != "" {
+	// Check if this is a file (has an extension)
+	isFile := filepath.Ext(relPath) != ""
+	var dirPath string
+	var filename string
+
+	if isFile {
+		// Extract directory path and filename
 		dirPath = filepath.Dir(relPath)
+		filename = filepath.Base(relPath)
+	} else {
+		dirPath = relPath
 	}
 
 	// Normalize path separators and clean up
 	dirPath = filepath.ToSlash(dirPath)
 	dirPath = strings.Trim(dirPath, "/")
 
-	// If path is empty or "." after cleaning, return root breadcrumb only
-	if dirPath == "" || dirPath == "." {
-		return crumbs
+	// If directory path is not empty or ".", add directory breadcrumbs
+	if dirPath != "" && dirPath != "." {
+		// Split path into segments
+		parts := strings.Split(dirPath, "/")
+		collectPath := "/"
+
+		// Create breadcrumb for each directory segment
+		for _, part := range parts {
+			if part == "" {
+				continue
+			}
+
+			// URL encode the directory name
+			encodedPart := url.PathEscape(part)
+			fullLink := collectPath + encodedPart + "/"
+
+			crumbs = append(crumbs, Breadcrumb{
+				Href: fullLink,
+				Text: part + "/",
+			})
+
+			collectPath = fullLink
+		}
 	}
 
-	// Split path into segments
-	parts := strings.Split(dirPath, "/")
-	collectPath := "/"
+	// If this is a file, add the filename as the final breadcrumb
+	if isFile {
+		// Remove .md extension from display
+		displayName := strings.TrimSuffix(filename, ".md")
 
-	// Create breadcrumb for each directory segment
-	for _, part := range parts {
-		if part == "" {
-			continue
+		// Build the full URL path for the file
+		relSlash := filepath.ToSlash(relPath)
+		parts := strings.Split(relSlash, "/")
+		encodedParts := make([]string, len(parts))
+		for i, part := range parts {
+			encodedParts[i] = url.PathEscape(part)
 		}
-
-		// URL encode the directory name
-		encodedPart := url.PathEscape(part)
-		fullLink := collectPath + encodedPart + "/"
+		fileURL := "/" + strings.Join(encodedParts, "/")
 
 		crumbs = append(crumbs, Breadcrumb{
-			Href: fullLink,
-			Text: part + "/",
+			Href: fileURL,
+			Text: displayName,
 		})
-
-		collectPath = fullLink
 	}
 
 	return crumbs
