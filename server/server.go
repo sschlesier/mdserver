@@ -54,9 +54,6 @@ func NewServer(config Config) *Server {
 func (s *Server) Start() error {
 	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
 	log.Printf("Listening on %s", addr)
-	if s.liveReload != nil {
-		log.Println("LiveReload: Enabled")
-	}
 	return http.ListenAndServe(addr, s.mux)
 }
 
@@ -167,6 +164,8 @@ func (s *Server) handleStaticFile(w http.ResponseWriter, r *http.Request, filePa
 		return
 	}
 
+	log.Printf("file: %s", s.relPath(filePath))
+
 	// Set appropriate Content-Type based on extension
 	ext := strings.ToLower(filepath.Ext(filePath))
 	contentType := getContentType(ext)
@@ -174,6 +173,19 @@ func (s *Server) handleStaticFile(w http.ResponseWriter, r *http.Request, filePa
 
 	// Serve file
 	http.ServeFile(w, r, filePath)
+}
+
+// relPath returns a path relative to the root directory, or the original path if it's outside the root
+func (s *Server) relPath(path string) string {
+	rel, err := filepath.Rel(s.config.RootDir, path)
+	if err != nil {
+		return path
+	}
+	// If path is outside root directory, return original
+	if strings.HasPrefix(rel, "..") {
+		return path
+	}
+	return rel
 }
 
 // getContentType returns the MIME type for a file extension

@@ -23,6 +23,9 @@ func main() {
 	)
 	flag.Parse()
 
+	// Remove timestamp prefix from log messages
+	log.SetFlags(0)
+
 	// Resolve absolute path for directory
 	rootDir, err := filepath.Abs(*dir)
 	if err != nil {
@@ -93,4 +96,3 @@ func findAvailablePort(host string) int {
 	}
 	return 0
 }
-

@@ -20,12 +20,12 @@ var upgrader = websocket.Upgrader{
 
 // LiveReload manages file watching and WebSocket connections for live reload
 type LiveReload struct {
-	rootDir     string
-	watcher     *fsnotify.Watcher
-	clients     map[*websocket.Conn]bool
-	clientsMu   sync.RWMutex
-	broadcast   chan []byte
-	stopChan    chan struct{}
+	rootDir   string
+	watcher   *fsnotify.Watcher
+	clients   map[*websocket.Conn]bool
+	clientsMu sync.RWMutex
+	broadcast chan []byte
+	stopChan  chan struct{}
 }
 
 // NewLiveReload creates a new LiveReload instance
@@ -58,7 +58,6 @@ func (lr *LiveReload) Start() error {
 	go lr.watchFiles()
 	go lr.broadcastMessages()
 
-	log.Println("LiveReload: Watching for file changes")
 	return nil
 }
 
@@ -89,7 +88,7 @@ func (lr *LiveReload) watchDirectory(dir string) error {
 			}
 			// Recursively watch subdirectories
 			if err := lr.watchDirectory(entry); err != nil {
-				log.Printf("LiveReload: Error watching directory %s: %v", entry, err)
+				// log.Printf("LiveReload: Error watching directory %s: %v", entry, err)
 			}
 		}
 	}
@@ -108,7 +107,7 @@ func (lr *LiveReload) watchFiles() {
 			// Only reload on write events for .md files
 			if event.Op&fsnotify.Write == fsnotify.Write {
 				if filepath.Ext(event.Name) == ".md" {
-					log.Printf("LiveReload: File changed: %s", event.Name)
+					// log.Printf("LiveReload: File changed: %s", event.Name)
 					lr.broadcast <- []byte("reload")
 				}
 			}
@@ -162,7 +161,7 @@ func (lr *LiveReload) broadcastMessages() {
 func (lr *LiveReload) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("LiveReload: WebSocket upgrade error: %v", err)
+		// log.Printf("LiveReload: WebSocket upgrade error: %v", err)
 		return
 	}
 
@@ -171,7 +170,7 @@ func (lr *LiveReload) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	lr.clients[conn] = true
 	lr.clientsMu.Unlock()
 
-	log.Printf("LiveReload: Client connected (total: %d)", len(lr.clients))
+	// log.Printf("LiveReload: Client connected (total: %d)", len(lr.clients))
 
 	// Handle client disconnection
 	go func() {
@@ -180,7 +179,7 @@ func (lr *LiveReload) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			delete(lr.clients, conn)
 			lr.clientsMu.Unlock()
 			conn.Close()
-			log.Printf("LiveReload: Client disconnected (total: %d)", len(lr.clients))
+			// log.Printf("LiveReload: Client disconnected (total: %d)", len(lr.clients))
 		}()
 
 		// Read loop to detect disconnection
@@ -207,4 +206,3 @@ func (lr *LiveReload) Stop() {
 
 	log.Println("LiveReload: Stopped")
 }
-

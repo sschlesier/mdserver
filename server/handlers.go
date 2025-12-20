@@ -21,6 +21,7 @@ type Breadcrumb struct {
 
 // handleMarkdown serves a markdown file as HTML
 func (s *Server) handleMarkdown(w http.ResponseWriter, r *http.Request, filePath string) {
+	log.Printf("markdown: %s", s.relPath(filePath))
 	// Read markdown file
 	content, err := os.ReadFile(filePath)
 	if err != nil {
@@ -82,6 +83,7 @@ type DirectoryEntry struct {
 
 // handleIndex generates a directory index page
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, dirPath string) {
+	log.Printf("dir: %s", s.relPath(dirPath))
 	// Read directory entries
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
@@ -252,6 +254,8 @@ func (s *Server) handleAssets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("file: %s", s.relPath(filePath))
+
 	// Set appropriate Content-Type
 	ext := strings.ToLower(filepath.Ext(filePath))
 	contentType := getContentType(ext)
@@ -280,11 +284,13 @@ func (s *Server) serveCSS(w http.ResponseWriter, r *http.Request) {
 	// Check if file exists
 	if _, err := os.Stat(cssPath); os.IsNotExist(err) {
 		// Serve default CSS inline
+		log.Printf("file: %s (default CSS)", cssPath)
 		w.Header().Set("Content-Type", "text/css; charset=utf-8")
 		w.Write([]byte(getDefaultCSS()))
 		return
 	}
 
+	log.Printf("file: %s", cssPath)
 	w.Header().Set("Content-Type", "text/css; charset=utf-8")
 	http.ServeFile(w, r, cssPath)
 }
