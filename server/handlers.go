@@ -5,12 +5,19 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"mdserver/renderer"
 )
+
+// Breadcrumb represents a single breadcrumb navigation item
+type Breadcrumb struct {
+	Href string
+	Text string
+}
 
 // handleMarkdown serves a markdown file as HTML
 func (s *Server) handleMarkdown(w http.ResponseWriter, r *http.Request, filePath string) {
@@ -31,6 +38,15 @@ func (s *Server) handleMarkdown(w http.ResponseWriter, r *http.Request, filePath
 	// Extract title from first h1 or use filename
 	title := extractTitle(string(content), filepath.Base(filePath))
 
+	// Calculate relative path from root directory for breadcrumbs
+	relPath, err := filepath.Rel(s.config.RootDir, filePath)
+	if err != nil {
+		relPath = filepath.Base(filePath)
+	}
+
+	// Generate breadcrumbs
+	breadcrumbs := createBreadcrumbs(relPath)
+
 	// Load and execute template
 	tmpl, err := loadTemplate()
 	if err != nil {
@@ -39,52 +55,114 @@ func (s *Server) handleMarkdown(w http.ResponseWriter, r *http.Request, filePath
 	}
 
 	data := struct {
-		Title   string
-		Content template.HTML
+		Title       string
+		Content     template.HTML
+		Breadcrumbs []Breadcrumb
 	}{
-		Title:   title,
-		Content: template.HTML(htmlContent),
+		Title:       title,
+		Content:     template.HTML(htmlContent),
+		Breadcrumbs: breadcrumbs,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := tmpl.Execute(w, data); err != nil {
 		log.Printf("Template execution error: %v", err)
 		http.Error(w, "Failed to render template", http.StatusInternalServerError)
+		return
 	}
 }
 
+// DirectoryEntry represents a file or directory in a listing
+type DirectoryEntry struct {
+	Name       string
+	Path       string
+	IsDir      bool
+	IsMarkdown bool
+}
+
 // handleIndex generates a directory index page
-func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
-	entries, err := os.ReadDir(s.config.RootDir)
+func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, dirPath string) {
+	// Read directory entries
+	entries, err := os.ReadDir(dirPath)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to read directory: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	var markdownFiles []string
+	// Calculate relative path from root directory for breadcrumbs
+	relPath, err := filepath.Rel(s.config.RootDir, dirPath)
+	if err != nil {
+		relPath = "."
+	}
+
+	// Generate breadcrumbs
+	breadcrumbs := createBreadcrumbs(relPath)
+
+	// Build list of entries
+	var dirEntries []DirectoryEntry
 	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(strings.ToLower(entry.Name()), ".md") {
-			markdownFiles = append(markdownFiles, entry.Name())
+		// Skip hidden files/directories
+		if strings.HasPrefix(entry.Name(), ".") {
+			continue
 		}
+
+		entryPath := filepath.Join(dirPath, entry.Name())
+		relEntryPath, err := filepath.Rel(s.config.RootDir, entryPath)
+		if err != nil {
+			continue
+		}
+
+		// Build URL path with proper encoding
+		relSlash := filepath.ToSlash(relEntryPath)
+		parts := strings.Split(relSlash, "/")
+		encodedParts := make([]string, len(parts))
+		for i, part := range parts {
+			encodedParts[i] = url.PathEscape(part)
+		}
+		urlPath := "/" + strings.Join(encodedParts, "/")
+		if entry.IsDir() {
+			urlPath += "/"
+		}
+
+		isMarkdown := !entry.IsDir() && strings.HasSuffix(strings.ToLower(entry.Name()), ".md")
+
+		dirEntries = append(dirEntries, DirectoryEntry{
+			Name:       entry.Name(),
+			Path:       urlPath,
+			IsDir:      entry.IsDir(),
+			IsMarkdown: isMarkdown,
+		})
 	}
 
-	// Generate simple HTML index
-	html := "<!DOCTYPE html>\n<html><head><meta charset='utf-8'><title>Index</title>"
-	html += "<link rel='stylesheet' href='/assets/style.css'>"
-	html += "</head><body><div class='container'><h1>Markdown Files</h1><ul>"
-
-	if len(markdownFiles) == 0 {
-		html += "<li>No markdown files found</li>"
-	} else {
-		for _, file := range markdownFiles {
-			html += fmt.Sprintf("<li><a href='/%s'>%s</a></li>", file, file)
-		}
+	// Load directory template
+	tmpl, err := loadDirectoryTemplate()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to load template: %v", err), http.StatusInternalServerError)
+		return
 	}
 
-	html += "</ul></div></body></html>"
+	// Determine title
+	title := "Index"
+	if relPath != "." && relPath != "" {
+		title = filepath.Base(dirPath)
+	}
+
+	data := struct {
+		Title       string
+		Breadcrumbs []Breadcrumb
+		Entries     []DirectoryEntry
+	}{
+		Title:       title,
+		Breadcrumbs: breadcrumbs,
+		Entries:     dirEntries,
+	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(html))
+	if err := tmpl.Execute(w, data); err != nil {
+		log.Printf("Template execution error: %v", err)
+		http.Error(w, "Failed to render template", http.StatusInternalServerError)
+		return
+	}
 }
 
 // handleAssets serves static files (images, CSS, JS)
@@ -185,7 +263,43 @@ func loadTemplate() (*template.Template, error) {
 		return getDefaultTemplate()
 	}
 
-	return template.New("page").Parse(string(tmplContent))
+	tmpl, parseErr := template.New("page").Parse(string(tmplContent))
+	if parseErr != nil {
+		return nil, parseErr
+	}
+
+	return tmpl, nil
+}
+
+// loadDirectoryTemplate loads the directory listing template
+func loadDirectoryTemplate() (*template.Template, error) {
+	// Try to find template directory relative to executable or current directory
+	exePath, err := os.Executable()
+	var templatePath string
+	if err == nil {
+		exeDir := filepath.Dir(exePath)
+		templatePath = filepath.Join(exeDir, "template", "directory.html")
+		if _, err := os.Stat(templatePath); os.IsNotExist(err) {
+			// Try relative to current working directory
+			templatePath = "template/directory.html"
+		}
+	} else {
+		templatePath = "template/directory.html"
+	}
+
+	// Try to load template file
+	tmplContent, err := os.ReadFile(templatePath)
+	if err != nil {
+		// Use default directory template
+		return getDefaultDirectoryTemplate()
+	}
+
+	tmpl, parseErr := template.New("directory").Parse(string(tmplContent))
+	if parseErr != nil {
+		return nil, parseErr
+	}
+
+	return tmpl, nil
 }
 
 // getDefaultTemplate returns a default HTML template
@@ -200,11 +314,45 @@ func getDefaultTemplate() (*template.Template, error) {
 </head>
 <body>
 	<div class="container">
+		{{if .Breadcrumbs}}
+		<nav class="breadcrumbs">
+			{{range .Breadcrumbs}}<a href="{{.Href}}">{{.Text}}</a>{{end}}
+		</nav>
+		{{end}}
 		{{.Content}}
 	</div>
 </body>
 </html>`
 	return template.New("page").Parse(tmpl)
+}
+
+// getDefaultDirectoryTemplate returns a default directory listing template
+func getDefaultDirectoryTemplate() (*template.Template, error) {
+	tmpl := `<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>{{.Title}}</title>
+	<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+	<div class="container">
+		<nav class="breadcrumbs">
+			{{range .Breadcrumbs}}<a href="{{.Href}}">{{.Text}}</a>{{end}}
+		</nav>
+		<h1>{{.Title}}</h1>
+		<ul class="directory-listing">
+			{{range .Entries}}
+			<li class="{{if .IsDir}}directory{{else if .IsMarkdown}}markdown{{else}}file{{end}}">
+				<a href="{{.Path}}">{{.Name}}{{if .IsDir}}/{{end}}</a>
+			</li>
+			{{end}}
+		</ul>
+	</div>
+</body>
+</html>`
+	return template.New("directory").Parse(tmpl)
 }
 
 // extractTitle extracts title from markdown content or uses filename
@@ -220,6 +368,59 @@ func extractTitle(content, filename string) string {
 	return strings.TrimSuffix(filename, ".md")
 }
 
+// createBreadcrumbs generates breadcrumb navigation from a relative path
+// relPath should be relative to the root directory (e.g., "docs/subdir" or "docs/subdir/file.md")
+// For markdown files, it generates breadcrumbs for the containing directory
+func createBreadcrumbs(relPath string) []Breadcrumb {
+	crumbs := []Breadcrumb{
+		{Href: "/", Text: "./"},
+	}
+
+	// If path is empty or just ".", return root breadcrumb only
+	if relPath == "" || relPath == "." {
+		return crumbs
+	}
+
+	// For markdown files, get the directory path
+	dirPath := relPath
+	if filepath.Ext(relPath) != "" {
+		dirPath = filepath.Dir(relPath)
+	}
+
+	// Normalize path separators and clean up
+	dirPath = filepath.ToSlash(dirPath)
+	dirPath = strings.Trim(dirPath, "/")
+
+	// If path is empty or "." after cleaning, return root breadcrumb only
+	if dirPath == "" || dirPath == "." {
+		return crumbs
+	}
+
+	// Split path into segments
+	parts := strings.Split(dirPath, "/")
+	collectPath := "/"
+
+	// Create breadcrumb for each directory segment
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+
+		// URL encode the directory name
+		encodedPart := url.PathEscape(part)
+		fullLink := collectPath + encodedPart + "/"
+
+		crumbs = append(crumbs, Breadcrumb{
+			Href: fullLink,
+			Text: part + "/",
+		})
+
+		collectPath = fullLink
+	}
+
+	return crumbs
+}
+
 // getDefaultCSS returns default CSS content
 func getDefaultCSS() string {
 	return `/* Default CSS - template/style.css not found */
@@ -230,4 +431,3 @@ table { border-collapse: collapse; width: 100%; }
 th, td { border: 1px solid #ddd; padding: 8px 12px; }
 th { background: #f8f8f8; }`
 }
-

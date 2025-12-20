@@ -13,7 +13,14 @@
 			{{range .Breadcrumbs}}<a href="{{.Href}}">{{.Text}}</a>{{end}}
 		</nav>
 		{{end}}
-		{{.Content}}
+		<h1>{{.Title}}</h1>
+		<ul class="directory-listing">
+			{{range .Entries}}
+			<li class="{{if .IsDir}}directory{{else if .IsMarkdown}}markdown{{else}}file{{end}}">
+				<a href="{{.Path}}">{{.Name}}{{if .IsDir}}/{{end}}</a>
+			</li>
+			{{end}}
+		</ul>
 	</div>
 </body>
 </html>

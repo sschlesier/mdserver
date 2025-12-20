@@ -72,7 +72,7 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Otherwise serve directory index
-		s.handleIndex(w, r)
+		s.handleIndex(w, r, s.config.RootDir)
 		return
 	}
 
@@ -83,6 +83,17 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	filePath := filepath.Join(s.config.RootDir, requestPath)
+
+	// Check if path exists and is a directory
+	if info, err := os.Stat(filePath); err == nil && info.IsDir() {
+		// Ensure directory paths end with / for consistency
+		if !strings.HasSuffix(requestPath, "/") && !strings.HasSuffix(r.URL.Path, "/") {
+			http.Redirect(w, r, r.URL.Path+"/", http.StatusMovedPermanently)
+			return
+		}
+		s.handleIndex(w, r, filePath)
+		return
+	}
 
 	// Check if it's a markdown file (has .md extension or no extension)
 	ext := filepath.Ext(filePath)
