@@ -82,6 +82,12 @@ jobs:
         with:
           path: release
 
+      - name: Flatten release directory
+        run: |
+          cd release
+          find . -type f -exec mv {} . \;
+          find . -type d ! -path . -exec rm -r {} + || true
+
       - name: Generate checksums
         run: |
           cd release
