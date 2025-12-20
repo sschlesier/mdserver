@@ -9,24 +9,6 @@ jobs:
   build:
     name: Build binaries
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - goos: darwin
-            goarch: amd64
-            name: macos-amd64
-          - goos: darwin
-            goarch: arm64
-            name: macos-arm64
-          - goos: linux
-            goarch: amd64
-            name: linux-amd64
-          - goos: linux
-            goarch: arm64
-            name: linux-arm64
-          - goos: windows
-            goarch: amd64
-            name: windows-amd64
 
     steps:
       - name: Checkout code
@@ -47,24 +29,42 @@ jobs:
           echo "COMMIT=$COMMIT" >> $GITHUB_OUTPUT
           echo "DATE=$DATE" >> $GITHUB_OUTPUT
 
-      - name: Build binary
+      - name: Build all binaries
         env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0
           VERSION: ${{ steps.version.outputs.VERSION }}
           COMMIT: ${{ steps.version.outputs.COMMIT }}
           DATE: ${{ steps.version.outputs.DATE }}
         run: |
-          go build -ldflags="-s -w -X main.version=$VERSION -X main.commit=$COMMIT -X main.date=$DATE" -o mdserver${{ matrix.goos == 'windows' && '.exe' || '' }} .
           mkdir -p release
-          mv mdserver${{ matrix.goos == 'windows' && '.exe' || '' }} release/mdserver-${{ matrix.name }}${{ matrix.goos == 'windows' && '.exe' || '' }}
+          
+          # Define platforms: GOOS/GOARCH/OUTPUT_NAME
+          PLATFORMS=(
+            "darwin/amd64/macos-amd64"
+            "darwin/arm64/macos-arm64"
+            "linux/amd64/linux-amd64"
+            "linux/arm64/linux-arm64"
+            "windows/amd64/windows-amd64.exe"
+          )
+          
+          for platform in "${PLATFORMS[@]}"; do
+            IFS='/' read -r goos goarch name <<< "$platform"
+            echo "Building for $goos/$goarch -> mdserver-$name"
+            
+            GOOS=$goos GOARCH=$goarch go build \
+              -ldflags="-s -w -X main.version=$VERSION -X main.commit=$COMMIT -X main.date=$DATE" \
+              -o release/mdserver-$name \
+              .
+          done
+          
+          echo "Build complete. Binaries:"
+          ls -lh release/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mdserver-${{ matrix.name }}
-          path: release/mdserver-${{ matrix.name }}${{ matrix.goos == 'windows' && '.exe' || '' }}
+          name: mdserver-binaries
+          path: release/
 
   release:
     name: Create Release
@@ -77,20 +77,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download all artifacts
+      - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
+          name: mdserver-binaries
           path: release
-
-      - name: Flatten release directory
-        run: |
-          cd release
-          # Find all files recursively and move them to the root
-          find . -type f -not -path './checksums.txt' -exec sh -c 'mv "$1" "./$(basename "$1")"' _ {} \;
-          # Remove all empty directories
-          find . -type d -empty -delete
-          # Remove any remaining non-root directories
-          find . -mindepth 1 -type d -exec rm -rf {} + 2>/dev/null || true
 
       - name: Verify all binaries are present
         run: |
