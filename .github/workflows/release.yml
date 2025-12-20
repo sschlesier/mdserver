@@ -85,8 +85,38 @@ jobs:
       - name: Flatten release directory
         run: |
           cd release
-          find . -type f -exec mv {} . \;
-          find . -type d ! -path . -exec rm -r {} + || true
+          # Find all files recursively and move them to the root
+          find . -type f -not -path './checksums.txt' -exec sh -c 'mv "$1" "./$(basename "$1")"' _ {} \;
+          # Remove all empty directories
+          find . -type d -empty -delete
+          # Remove any remaining non-root directories
+          find . -mindepth 1 -type d -exec rm -rf {} + 2>/dev/null || true
+
+      - name: Verify all binaries are present
+        run: |
+          cd release
+          EXPECTED_BINARIES=(
+            "mdserver-macos-amd64"
+            "mdserver-macos-arm64"
+            "mdserver-linux-amd64"
+            "mdserver-linux-arm64"
+            "mdserver-windows-amd64.exe"
+          )
+          MISSING=()
+          for binary in "${EXPECTED_BINARIES[@]}"; do
+            if [ ! -f "$binary" ]; then
+              MISSING+=("$binary")
+            fi
+          done
+          if [ ${#MISSING[@]} -ne 0 ]; then
+            echo "Error: Missing binaries:"
+            printf '  - %s\n' "${MISSING[@]}"
+            echo "Found files:"
+            ls -la
+            exit 1
+          fi
+          echo "All binaries verified:"
+          ls -lh mdserver-*
 
       - name: Generate checksums
         run: |
