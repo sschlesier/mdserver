@@ -25,6 +25,9 @@ mdserver --host localhost --port 8080
 
 # Auto-select available port (default)
 mdserver --port 0
+
+# Show version information
+mdserver --version
 ```
 
 ## Features
@@ -41,4 +44,6 @@ mdserver --port 0
 - `--port` - Port to bind to (default: 0 for auto-selection)
 - `--file` - Specific markdown file to serve (optional)
 - `--dir` - Directory to serve (default: current working directory)
+- `--livereload` - Enable live reload (default: true)
+- `--version` - Show version information and exit
 

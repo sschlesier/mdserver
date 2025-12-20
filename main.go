@@ -13,6 +13,12 @@ import (
 	"mdserver/server"
 )
 
+var (
+	version = "dev"
+	commit  = "unknown"
+	date    = "unknown"
+)
+
 func main() {
 	var (
 		host       = flag.String("host", "localhost", "Host to bind to")
@@ -20,8 +26,17 @@ func main() {
 		file       = flag.String("file", "", "Specific markdown file to serve (optional)")
 		dir        = flag.String("dir", ".", "Directory to serve")
 		livereload = flag.Bool("livereload", true, "Enable live reload (default: true)")
+		showVersion = flag.Bool("version", false, "Show version information")
 	)
 	flag.Parse()
+
+	// Handle version flag
+	if *showVersion {
+		fmt.Printf("mdserver %s\n", version)
+		fmt.Printf("Commit: %s\n", commit)
+		fmt.Printf("Built: %s\n", date)
+		os.Exit(0)
+	}
 
 	// Remove timestamp prefix from log messages
 	log.SetFlags(0)
