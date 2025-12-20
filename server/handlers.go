@@ -48,7 +48,7 @@ func (s *Server) handleMarkdown(w http.ResponseWriter, r *http.Request, filePath
 	breadcrumbs := createBreadcrumbs(relPath)
 
 	// Load and execute template
-	tmpl, err := loadTemplate()
+	tmpl, err := s.loadTemplate()
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to load template: %v", err), http.StatusInternalServerError)
 		return
@@ -184,7 +184,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, dirPath str
 	}
 
 	// Load directory template
-	tmpl, err := loadDirectoryTemplate()
+	tmpl, err := s.loadDirectoryTemplate()
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to load template: %v", err), http.StatusInternalServerError)
 		return
@@ -290,7 +290,7 @@ func (s *Server) serveCSS(w http.ResponseWriter, r *http.Request) {
 }
 
 // loadTemplate loads the HTML template
-func loadTemplate() (*template.Template, error) {
+func (s *Server) loadTemplate() (*template.Template, error) {
 	// Try to find template directory relative to executable or current directory
 	exePath, err := os.Executable()
 	var templatePath string
@@ -309,10 +309,16 @@ func loadTemplate() (*template.Template, error) {
 	tmplContent, err := os.ReadFile(templatePath)
 	if err != nil {
 		// Use default template
-		return getDefaultTemplate()
+		return s.getDefaultTemplate()
 	}
 
-	tmpl, parseErr := template.New("page").Parse(string(tmplContent))
+	tmplContentStr := string(tmplContent)
+	// Inject LiveReload script if enabled
+	if s.config.EnableLiveReload {
+		tmplContentStr = s.injectLiveReloadScript(tmplContentStr)
+	}
+
+	tmpl, parseErr := template.New("page").Parse(tmplContentStr)
 	if parseErr != nil {
 		return nil, parseErr
 	}
@@ -321,7 +327,7 @@ func loadTemplate() (*template.Template, error) {
 }
 
 // loadDirectoryTemplate loads the directory listing template
-func loadDirectoryTemplate() (*template.Template, error) {
+func (s *Server) loadDirectoryTemplate() (*template.Template, error) {
 	// Try to find template directory relative to executable or current directory
 	exePath, err := os.Executable()
 	var templatePath string
@@ -340,10 +346,16 @@ func loadDirectoryTemplate() (*template.Template, error) {
 	tmplContent, err := os.ReadFile(templatePath)
 	if err != nil {
 		// Use default directory template
-		return getDefaultDirectoryTemplate()
+		return s.getDefaultDirectoryTemplate()
 	}
 
-	tmpl, parseErr := template.New("directory").Parse(string(tmplContent))
+	tmplContentStr := string(tmplContent)
+	// Inject LiveReload script if enabled
+	if s.config.EnableLiveReload {
+		tmplContentStr = s.injectLiveReloadScript(tmplContentStr)
+	}
+
+	tmpl, parseErr := template.New("directory").Parse(tmplContentStr)
 	if parseErr != nil {
 		return nil, parseErr
 	}
@@ -352,7 +364,7 @@ func loadDirectoryTemplate() (*template.Template, error) {
 }
 
 // getDefaultTemplate returns a default HTML template
-func getDefaultTemplate() (*template.Template, error) {
+func (s *Server) getDefaultTemplate() (*template.Template, error) {
 	tmpl := `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -372,11 +384,18 @@ func getDefaultTemplate() (*template.Template, error) {
 	</div>
 </body>
 </html>`
-	return template.New("page").Parse(tmpl)
+
+	tmplStr := tmpl
+	// Inject LiveReload script if enabled
+	if s.config.EnableLiveReload {
+		tmplStr = s.injectLiveReloadScript(tmplStr)
+	}
+
+	return template.New("page").Parse(tmplStr)
 }
 
 // getDefaultDirectoryTemplate returns a default directory listing template
-func getDefaultDirectoryTemplate() (*template.Template, error) {
+func (s *Server) getDefaultDirectoryTemplate() (*template.Template, error) {
 	tmpl := `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -401,7 +420,14 @@ func getDefaultDirectoryTemplate() (*template.Template, error) {
 	</div>
 </body>
 </html>`
-	return template.New("directory").Parse(tmpl)
+
+	tmplStr := tmpl
+	// Inject LiveReload script if enabled
+	if s.config.EnableLiveReload {
+		tmplStr = s.injectLiveReloadScript(tmplStr)
+	}
+
+	return template.New("directory").Parse(tmplStr)
 }
 
 // extractTitle extracts title from markdown content or uses filename
@@ -493,6 +519,43 @@ func createBreadcrumbs(relPath string) []Breadcrumb {
 	}
 
 	return crumbs
+}
+
+// injectLiveReloadScript injects the LiveReload client script into HTML templates
+func (s *Server) injectLiveReloadScript(html string) string {
+	script := `<script>
+(function() {
+	function connect() {
+		var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+		var host = window.location.host;
+		var ws = new WebSocket(protocol + '//' + host + '/livereload');
+		
+		ws.onmessage = function(event) {
+			if (event.data === 'reload') {
+				window.location.reload();
+			}
+		};
+		
+		ws.onerror = function(error) {
+			console.log('LiveReload connection error:', error);
+		};
+		
+		ws.onclose = function() {
+			// Attempt to reconnect after 1 second
+			setTimeout(connect, 1000);
+		};
+	}
+	
+	connect();
+})();
+</script>`
+
+	// Inject script before closing </body> tag
+	if strings.Contains(html, "</body>") {
+		return strings.Replace(html, "</body>", script+"</body>", 1)
+	}
+	// If no </body> tag, append at the end
+	return html + script
 }
 
 // getDefaultCSS returns default CSS content

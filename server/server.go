@@ -11,16 +11,18 @@ import (
 
 // Config holds server configuration
 type Config struct {
-	Host    string
-	Port    int
-	RootDir string
-	File    string
+	Host             string
+	Port             int
+	RootDir          string
+	File             string
+	EnableLiveReload bool
 }
 
 // Server represents the HTTP server
 type Server struct {
-	config Config
-	mux    *http.ServeMux
+	config     Config
+	mux        *http.ServeMux
+	liveReload *LiveReload
 }
 
 // NewServer creates a new server instance
@@ -29,6 +31,21 @@ func NewServer(config Config) *Server {
 		config: config,
 		mux:    http.NewServeMux(),
 	}
+
+	// Initialize LiveReload if enabled
+	if config.EnableLiveReload {
+		var err error
+		s.liveReload, err = NewLiveReload(config.RootDir)
+		if err != nil {
+			log.Printf("Failed to initialize LiveReload: %v", err)
+		} else {
+			if err := s.liveReload.Start(); err != nil {
+				log.Printf("Failed to start LiveReload: %v", err)
+				s.liveReload = nil
+			}
+		}
+	}
+
 	s.setupRoutes()
 	return s
 }
@@ -37,13 +54,28 @@ func NewServer(config Config) *Server {
 func (s *Server) Start() error {
 	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
 	log.Printf("Listening on %s", addr)
+	if s.liveReload != nil {
+		log.Println("LiveReload: Enabled")
+	}
 	return http.ListenAndServe(addr, s.mux)
+}
+
+// Stop stops the server and cleans up resources
+func (s *Server) Stop() {
+	if s.liveReload != nil {
+		s.liveReload.Stop()
+	}
 }
 
 // setupRoutes configures all HTTP routes
 func (s *Server) setupRoutes() {
 	// Static assets handler (must be registered first for /assets/ path)
 	s.mux.HandleFunc("/assets/", s.handleAssets)
+
+	// LiveReload WebSocket endpoint
+	if s.liveReload != nil {
+		s.mux.HandleFunc("/livereload", s.liveReload.HandleWebSocket)
+	}
 
 	// Root handler - handles all other routes including root and markdown files
 	s.mux.HandleFunc("/", s.handleRequest)

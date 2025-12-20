@@ -15,10 +15,11 @@ import (
 
 func main() {
 	var (
-		host = flag.String("host", "localhost", "Host to bind to")
-		port = flag.Int("port", 0, "Port to bind to (0 for auto-selection)")
-		file = flag.String("file", "", "Specific markdown file to serve (optional)")
-		dir  = flag.String("dir", ".", "Directory to serve")
+		host       = flag.String("host", "localhost", "Host to bind to")
+		port       = flag.Int("port", 0, "Port to bind to (0 for auto-selection)")
+		file       = flag.String("file", "", "Specific markdown file to serve (optional)")
+		dir        = flag.String("dir", ".", "Directory to serve")
+		livereload = flag.Bool("livereload", true, "Enable live reload (default: true)")
 	)
 	flag.Parse()
 
@@ -44,10 +45,11 @@ func main() {
 
 	// Create server configuration
 	config := server.Config{
-		Host:    *host,
-		Port:    actualPort,
-		RootDir: rootDir,
-		File:    *file,
+		Host:             *host,
+		Port:             actualPort,
+		RootDir:          rootDir,
+		File:             *file,
+		EnableLiveReload: *livereload,
 	}
 
 	// Initialize and start server
@@ -60,6 +62,7 @@ func main() {
 	go func() {
 		<-sigChan
 		log.Println("\nShutting down server...")
+		srv.Stop()
 		os.Exit(0)
 	}()
 
