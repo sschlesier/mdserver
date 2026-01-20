@@ -110,6 +110,18 @@ pre code {
 	font-size: 0.85em;
 }
 
+/* Mermaid diagrams */
+.mermaid {
+	margin: 1.5em 0;
+	text-align: center;
+	overflow-x: auto;
+}
+
+.mermaid svg {
+	max-width: 100%;
+	height: auto;
+}
+
 /* Lists */
 ul, ol {
 	margin: 1em 0;

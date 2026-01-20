@@ -378,6 +378,7 @@ func (s *Server) getDefaultTemplate() (*template.Template, error) {
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>{{.Title}}</title>
 	<link rel="stylesheet" href="/assets/style.css">
+	<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 </head>
 <body>
 	<div class="container">
@@ -388,6 +389,9 @@ func (s *Server) getDefaultTemplate() (*template.Template, error) {
 		{{end}}
 		{{.Content}}
 	</div>
+	<script>
+		mermaid.initialize({ startOnLoad: true, theme: 'default' });
+	</script>
 </body>
 </html>`
 
@@ -535,23 +539,23 @@ func (s *Server) injectLiveReloadScript(html string) string {
 		var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 		var host = window.location.host;
 		var ws = new WebSocket(protocol + '//' + host + '/livereload');
-		
+
 		ws.onmessage = function(event) {
 			if (event.data === 'reload') {
 				window.location.reload();
 			}
 		};
-		
+
 		ws.onerror = function(error) {
 			console.log('LiveReload connection error:', error);
 		};
-		
+
 		ws.onclose = function() {
 			// Attempt to reconnect after 1 second
 			setTimeout(connect, 1000);
 		};
 	}
-	
+
 	connect();
 })();
 </script>`
