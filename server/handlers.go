@@ -238,6 +238,12 @@ func (s *Server) handleAssets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if this is a request for style.css
+	if requestPath == "style.css" {
+		s.serveCSS(w, r)
+		return
+	}
+
 	// Construct full file path
 	filePath := filepath.Join(s.config.RootDir, requestPath)
 
@@ -286,12 +292,18 @@ func (s *Server) serveCSS(w http.ResponseWriter, r *http.Request) {
 		// Serve default CSS inline
 		log.Printf("file: %s (default CSS)", cssPath)
 		w.Header().Set("Content-Type", "text/css; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
 		w.Write([]byte(getDefaultCSS()))
 		return
 	}
 
 	log.Printf("file: %s", cssPath)
 	w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
 	http.ServeFile(w, r, cssPath)
 }
 
