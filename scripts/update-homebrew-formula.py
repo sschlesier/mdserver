@@ -24,8 +24,8 @@ def update_formula(formula_file, version, checksums):
     with open(formula_file, 'r') as f:
         lines = f.readlines()
     
-    # Remove 'v' prefix from version for URLs
-    version_url = version.lstrip('v')
+    # Ensure 'v' prefix for URLs
+    version_url = version if version.startswith('v') else f'v{version}'
     
     # Map binary names to their checksums
     checksum_map = {
@@ -55,12 +55,12 @@ def update_formula(formula_file, version, checksums):
             continue
         
         # Update URL lines with new version
-        url_match = re.search(r'releases/download/v[^/]+/(mdserver-[^"]+)', line)
+        url_match = re.search(r'releases/download/(v?[^/]+)/(mdserver-[^"]+)', line)
         if url_match:
-            binary_name = url_match.group(1)
+            binary_name = url_match.group(2)
             # Replace version in URL
             new_line = re.sub(
-                r'releases/download/v[^/]+/',
+                r'releases/download/[^/]+/',
                 f'releases/download/{version_url}/',
                 line
             )
