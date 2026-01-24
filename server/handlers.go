@@ -16,7 +16,7 @@ import (
 // Breadcrumb represents a single breadcrumb navigation item
 type Breadcrumb struct {
 	Href string
-	Text string
+	Text template.HTML
 }
 
 // handleMarkdown serves a markdown file as HTML
@@ -476,7 +476,7 @@ func extractTitle(content, filename string) string {
 // For markdown files, it generates breadcrumbs for the containing directory and includes the filename
 func createBreadcrumbs(relPath string) []Breadcrumb {
 	crumbs := []Breadcrumb{
-		{Href: "/", Text: "./"},
+		{Href: "/", Text: template.HTML(`<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="vertical-align: middle; display: inline-block;"><path d="M8 0L0 7h2v9h5v-6h2v6h5V7h2L8 0z"/></svg>/`)},
 	}
 
 	// If path is empty or just ".", return root breadcrumb only
@@ -519,7 +519,7 @@ func createBreadcrumbs(relPath string) []Breadcrumb {
 
 			crumbs = append(crumbs, Breadcrumb{
 				Href: fullLink,
-				Text: part + "/",
+				Text: template.HTML(part + "/"),
 			})
 
 			collectPath = fullLink
@@ -542,7 +542,7 @@ func createBreadcrumbs(relPath string) []Breadcrumb {
 
 		crumbs = append(crumbs, Breadcrumb{
 			Href: fileURL,
-			Text: displayName,
+			Text: template.HTML(displayName),
 		})
 	}
 
