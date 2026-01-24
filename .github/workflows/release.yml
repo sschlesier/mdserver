@@ -220,11 +220,11 @@ jobs:
             checksums.txt \
             homebrew-tap/Formula/mdserver.rb
 
-      - name: Commit and push changes
+      - name: Push changes
         run: |
           cd homebrew-tap
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
           
           if git diff --quiet Formula/mdserver.rb; then
             echo "No changes to formula"
@@ -233,4 +233,7 @@ jobs:
           
           git add Formula/mdserver.rb
           git commit -m "Update mdserver to ${{ github.ref_name }}"
-          git push
+          git remote set-url origin https://$HOMEBREW_PUSH_TOKEN@github.com/sschlesier/homebrew-mdserver.git
+          git push origin main
+        env:
+          HOMEBREW_PUSH_TOKEN: ${{ secrets.HOMEBREW_PUSH_TOKEN }}
