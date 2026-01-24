@@ -6,8 +6,31 @@ on:
       - 'v*.*.*'
 
 jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.5'
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: go test -v ./...
+
+      - name: Build (verify compilation)
+        run: go build -v .
+
   build:
     name: Build binaries
+    needs: test
     runs-on: ubuntu-latest
 
     steps:
@@ -129,7 +152,7 @@ jobs:
 
             **macOS (Homebrew):**
             ```bash
-            brew install yourusername/mdserver/mdserver
+            brew install sschlesier/mdserver/mdserver
             ```
 
             **macOS/Linux (manual):**
@@ -163,3 +186,51 @@ jobs:
           draft: false
           prerelease: ${{ contains(steps.tag.outputs.TAG_NAME, '-') }}
 
+  update-homebrew:
+    name: Update Homebrew Tap
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout homebrew-mdserver
+        uses: actions/checkout@v4
+        with:
+          repository: sschlesier/homebrew-mdserver
+          path: homebrew-tap
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout main repo (for scripts)
+        uses: actions/checkout@v4
+        with:
+          path: main-repo
+
+      - name: Download checksums from release
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          curl -L -o checksums.txt \
+            https://github.com/${{ github.repository }}/releases/download/${TAG_NAME}/checksums.txt
+
+      - name: Update Homebrew formula
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          python3 main-repo/scripts/update-homebrew-formula.py \
+            "${TAG_NAME}" \
+            checksums.txt \
+            homebrew-tap/Formula/mdserver.rb
+
+      - name: Commit and push changes
+        run: |
+          cd homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          if git diff --quiet Formula/mdserver.rb; then
+            echo "No changes to formula"
+            exit 0
+          fi
+          
+          git add Formula/mdserver.rb
+          git commit -m "Update mdserver to ${{ github.ref_name }}"
+          git push
