@@ -35,11 +35,17 @@ if [ -z "$ARM64_MACOS" ] || [ -z "$AMD64_MACOS" ] || [ -z "$ARM64_LINUX" ] || [ 
   exit 1
 fi
 
-# Update version
-sed -i.bak "s/version \"[^\"]*\"/version \"$VERSION\"/" "$FORMULA_FILE"
+# Strip 'v' prefix from version if present (version property must not have 'v' prefix)
+VERSION_NO_V=${VERSION#v}
 
-# Update URLs (remove 'v' prefix if present in version for URLs)
-VERSION_URL=${VERSION#v}
+# Update version (without 'v' prefix)
+sed -i.bak "s/version \"[^\"]*\"/version \"$VERSION_NO_V\"/" "$FORMULA_FILE"
+
+# Ensure URLs have 'v' prefix
+VERSION_URL=$VERSION
+if [[ ! "$VERSION_URL" =~ ^v ]]; then
+  VERSION_URL="v$VERSION_URL"
+fi
 
 # Update SHA256 checksums - handle both placeholder and existing checksums
 sed -i.bak "s/sha256 \"[^\"]*ARM64[^\"]*\"/sha256 \"$ARM64_MACOS\"/" "$FORMULA_FILE" || \

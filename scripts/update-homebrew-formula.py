@@ -24,6 +24,9 @@ def update_formula(formula_file, version, checksums):
     with open(formula_file, 'r') as f:
         lines = f.readlines()
     
+    # Strip 'v' prefix from version if present (version property must not have 'v' prefix)
+    version_no_v = version[1:] if version.startswith('v') else version
+    
     # Ensure 'v' prefix for URLs
     version_url = version if version.startswith('v') else f'v{version}'
     
@@ -42,7 +45,7 @@ def update_formula(formula_file, version, checksums):
         
         # Update version line
         if re.match(r'\s*version\s+"[^"]*"', line):
-            updated_lines.append(f'  version "{version}"\n')
+            updated_lines.append(f'  version "{version_no_v}"\n')
             i += 1
             # Skip revision line if present (new version resets revisions)
             if i < len(lines) and re.match(r'\s*revision\s+\d+', lines[i]):
