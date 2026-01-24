@@ -199,7 +199,7 @@ jobs:
         with:
           repository: sschlesier/homebrew-mdserver
           path: homebrew-tap
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.HOMEBREW_PUSH_TOKEN }}
 
       - name: Checkout main repo (for scripts)
         uses: actions/checkout@v4
