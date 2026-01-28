@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"mdserver/renderer"
 	"mdserver/server"
 )
 
@@ -21,13 +22,15 @@ var (
 
 func main() {
 	var (
-		host       = flag.String("host", "localhost", "Host to bind to")
-		port       = flag.Int("port", 0, "Port to bind to (0 for auto-selection)")
-		file       = flag.String("file", "", "Specific markdown file to serve (optional)")
-		dir        = flag.String("dir", ".", "Directory to serve")
-		livereload = flag.Bool("livereload", true, "Enable live reload (default: true)")
+		host        = flag.String("host", "localhost", "Host to bind to")
+		port        = flag.Int("port", 0, "Port to bind to (0 for auto-selection)")
+		file        = flag.String("file", "", "Specific markdown file to serve (optional)")
+		dir         = flag.String("dir", ".", "Directory to serve")
+		livereload  = flag.Bool("livereload", true, "Enable live reload (default: true)")
 		showVersion = flag.Bool("version", false, "Show version information")
+		render      = flag.Bool("render", false, "Render markdown to HTML and output to stdout")
 	)
+	flag.BoolVar(render, "r", false, "Render markdown to HTML and output to stdout (shorthand)")
 	flag.Parse()
 
 	// Handle version flag
@@ -35,6 +38,34 @@ func main() {
 		fmt.Printf("mdserver %s\n", version)
 		fmt.Printf("Commit: %s\n", commit)
 		fmt.Printf("Built: %s\n", date)
+		os.Exit(0)
+	}
+
+	// Handle render mode
+	if *render {
+		// Get input file from --file flag or positional arg
+		inputFile := *file
+		if inputFile == "" && flag.NArg() > 0 {
+			inputFile = flag.Arg(0)
+		}
+		if inputFile == "" {
+			fmt.Fprintln(os.Stderr, "Error: no input file specified")
+			os.Exit(1)
+		}
+
+		content, err := os.ReadFile(inputFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
+			os.Exit(1)
+		}
+
+		html, err := renderer.RenderStandalone(content, inputFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error rendering: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Print(string(html))
 		os.Exit(0)
 	}
 
