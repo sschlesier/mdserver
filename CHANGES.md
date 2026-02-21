@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.2
+
+- Auto-open browser on startup; use `--no-open` flag to disable
+
 ## v1.3.1
 
 - Fix crash when serving large directory trees (e.g. `$HOME` or `~/src`) by lazy-expanding file watches on demand instead of recursively watching all subdirectories at startup
