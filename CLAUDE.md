@@ -28,10 +28,12 @@ Follow [semver](https://semver.org/) when choosing the increment:
 
 Steps:
 
-1. Update `CHANGES.md` — add a section for the new version with user-facing changes at the top of the file
-2. Commit: `git commit -am "Prepare release vX.Y.Z"`
-3. Tag: `git tag vX.Y.Z`
-4. Push: `git push origin main && git push origin vX.Y.Z`
+1. Determine the latest tag and list commits since that tag
+2. **Ask the user** to choose patch / minor / major before proceeding (use AskUserQuestion with the three options; include the computed next version in each option's description)
+3. Update `CHANGES.md` — add a section for the new version with user-facing changes at the top of the file
+4. Commit: `git commit -am "Prepare release vX.Y.Z"`
+5. Tag: `git tag vX.Y.Z`
+6. Push: `git push origin main && git push origin vX.Y.Z`
 
 The `v*` tag push triggers the GitHub Actions release workflow which:
 - Runs tests
