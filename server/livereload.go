@@ -58,8 +58,9 @@ func NewLiveReload(rootDir string) (*LiveReload, error) {
 
 // Start begins watching for file changes
 func (lr *LiveReload) Start() error {
-	// Watch the root directory up to 3 levels deep
-	err := lr.watchDirectory(lr.rootDir, 3)
+	// Watch the root directory and immediate children only;
+	// deeper directories are watched on-demand via EnsureWatching.
+	err := lr.watchDirectory(lr.rootDir, 1)
 	if err != nil {
 		return err
 	}
@@ -73,6 +74,9 @@ func (lr *LiveReload) Start() error {
 
 // watchDirectory watches a directory and its subdirectories up to the given depth.
 // A depth of 0 means watch only the given directory itself (no children).
+// Returns an error only if the directory itself cannot be watched; errors on
+// child directories are logged and silently absorbed so that fd exhaustion
+// does not crash the process.
 func (lr *LiveReload) watchDirectory(dir string, depth int) error {
 	lr.watchedMu.Lock()
 	if lr.watched[dir] {
@@ -83,8 +87,7 @@ func (lr *LiveReload) watchDirectory(dir string, depth int) error {
 	lr.watchedMu.Unlock()
 
 	// Add the directory to the watcher
-	err := lr.watcher.Add(dir)
-	if err != nil {
+	if err := lr.watcher.Add(dir); err != nil {
 		return err
 	}
 
@@ -95,7 +98,7 @@ func (lr *LiveReload) watchDirectory(dir string, depth int) error {
 	// Watch subdirectories up to remaining depth
 	entries, err := filepath.Glob(filepath.Join(dir, "*"))
 	if err != nil {
-		return err
+		return nil // non-fatal: we already watch the parent
 	}
 
 	for _, entry := range entries {
@@ -115,7 +118,7 @@ func (lr *LiveReload) watchDirectory(dir string, depth int) error {
 				continue
 			}
 			if err := lr.watchDirectory(entry, depth-1); err != nil {
-				// log.Printf("LiveReload: Error watching directory %s: %v", entry, err)
+				log.Printf("LiveReload: cannot watch %s: %v", base, err)
 			}
 		}
 	}
@@ -133,7 +136,7 @@ func (lr *LiveReload) EnsureWatching(dir string) {
 		return
 	}
 
-	if err := lr.watchDirectory(dir, 2); err != nil {
+	if err := lr.watchDirectory(dir, 1); err != nil {
 		log.Printf("LiveReload: Error expanding watch to %s: %v", dir, err)
 	}
 }

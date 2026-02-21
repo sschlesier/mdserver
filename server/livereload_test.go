@@ -156,8 +156,8 @@ func TestEnsureWatchingDeepDirectory(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Create a directory 6 levels deep (beyond the initial depth of 3)
-	deepDir := filepath.Join(tmpDir, "a", "b", "c", "d", "e", "f")
+	// Create a directory beyond the initial watch depth of 1
+	deepDir := filepath.Join(tmpDir, "a", "b", "c")
 	if err := os.MkdirAll(deepDir, 0755); err != nil {
 		t.Fatalf("Failed to create deep directory: %v", err)
 	}
@@ -207,7 +207,7 @@ func TestEnsureWatchingDeepDirectory(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Write a .md file in the deep directory — should NOT trigger reload
-	// because initial watch depth is 3 (covers a/b/c but not d/e/f)
+	// because initial watch depth is 1 (covers only tmpDir + tmpDir/a)
 	deepFile := filepath.Join(deepDir, "test.md")
 	if err := os.WriteFile(deepFile, []byte("# Deep Test\n"), 0644); err != nil {
 		t.Fatalf("Failed to write deep file: %v", err)
