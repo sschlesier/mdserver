@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.1
+
+- Fix crash when serving large directory trees (e.g. `$HOME` or `~/src`) by lazy-expanding file watches on demand instead of recursively watching all subdirectories at startup
+
 ## v1.3.0
 
 - Add `--render` / `-r` flag for standalone HTML output to stdout
