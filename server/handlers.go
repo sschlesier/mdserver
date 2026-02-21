@@ -22,6 +22,9 @@ type Breadcrumb struct {
 // handleMarkdown serves a markdown file as HTML
 func (s *Server) handleMarkdown(w http.ResponseWriter, r *http.Request, filePath string) {
 	log.Printf("markdown: %s", s.relPath(filePath))
+	if s.liveReload != nil {
+		s.liveReload.EnsureWatching(filepath.Dir(filePath))
+	}
 	// Read markdown file
 	content, err := os.ReadFile(filePath)
 	if err != nil {
@@ -84,6 +87,9 @@ type DirectoryEntry struct {
 // handleIndex generates a directory index page
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, dirPath string) {
 	log.Printf("dir: %s", s.relPath(dirPath))
+	if s.liveReload != nil {
+		s.liveReload.EnsureWatching(dirPath)
+	}
 	// Read directory entries
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {

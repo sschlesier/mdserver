@@ -18,12 +18,21 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+// skipDirs are directories that should never be watched (heavy or irrelevant)
+var skipDirs = map[string]bool{
+	"node_modules": true,
+	"vendor":       true,
+	"__pycache__":  true,
+}
+
 // LiveReload manages file watching and WebSocket connections for live reload
 type LiveReload struct {
 	rootDir   string
 	watcher   *fsnotify.Watcher
 	clients   map[*websocket.Conn]bool
 	clientsMu sync.RWMutex
+	watched   map[string]bool
+	watchedMu sync.Mutex
 	broadcast chan []byte
 	stopChan  chan struct{}
 }
@@ -39,6 +48,7 @@ func NewLiveReload(rootDir string) (*LiveReload, error) {
 		rootDir:   rootDir,
 		watcher:   watcher,
 		clients:   make(map[*websocket.Conn]bool),
+		watched:   make(map[string]bool),
 		broadcast: make(chan []byte, 256),
 		stopChan:  make(chan struct{}),
 	}
@@ -48,8 +58,8 @@ func NewLiveReload(rootDir string) (*LiveReload, error) {
 
 // Start begins watching for file changes
 func (lr *LiveReload) Start() error {
-	// Watch the root directory recursively
-	err := lr.watchDirectory(lr.rootDir)
+	// Watch the root directory up to 3 levels deep
+	err := lr.watchDirectory(lr.rootDir, 3)
 	if err != nil {
 		return err
 	}
@@ -61,15 +71,28 @@ func (lr *LiveReload) Start() error {
 	return nil
 }
 
-// watchDirectory recursively watches a directory and its subdirectories
-func (lr *LiveReload) watchDirectory(dir string) error {
+// watchDirectory watches a directory and its subdirectories up to the given depth.
+// A depth of 0 means watch only the given directory itself (no children).
+func (lr *LiveReload) watchDirectory(dir string, depth int) error {
+	lr.watchedMu.Lock()
+	if lr.watched[dir] {
+		lr.watchedMu.Unlock()
+		return nil
+	}
+	lr.watched[dir] = true
+	lr.watchedMu.Unlock()
+
 	// Add the directory to the watcher
 	err := lr.watcher.Add(dir)
 	if err != nil {
 		return err
 	}
 
-	// Recursively watch subdirectories
+	if depth <= 0 {
+		return nil
+	}
+
+	// Watch subdirectories up to remaining depth
 	entries, err := filepath.Glob(filepath.Join(dir, "*"))
 	if err != nil {
 		return err
@@ -82,18 +105,37 @@ func (lr *LiveReload) watchDirectory(dir string) error {
 		}
 
 		if stat.IsDir() {
+			base := filepath.Base(entry)
 			// Skip hidden directories
-			if filepath.Base(entry)[0] == '.' {
+			if base[0] == '.' {
 				continue
 			}
-			// Recursively watch subdirectories
-			if err := lr.watchDirectory(entry); err != nil {
+			// Skip known-heavy directories
+			if skipDirs[base] {
+				continue
+			}
+			if err := lr.watchDirectory(entry, depth-1); err != nil {
 				// log.Printf("LiveReload: Error watching directory %s: %v", entry, err)
 			}
 		}
 	}
 
 	return nil
+}
+
+// EnsureWatching ensures the given directory (and a shallow subtree) is being watched.
+// Called on-demand when the user navigates to a directory or views a file.
+func (lr *LiveReload) EnsureWatching(dir string) {
+	lr.watchedMu.Lock()
+	already := lr.watched[dir]
+	lr.watchedMu.Unlock()
+	if already {
+		return
+	}
+
+	if err := lr.watchDirectory(dir, 2); err != nil {
+		log.Printf("LiveReload: Error expanding watch to %s: %v", dir, err)
+	}
 }
 
 // watchFiles monitors file system events and triggers reloads
@@ -115,9 +157,10 @@ func (lr *LiveReload) watchFiles() {
 			if event.Op&fsnotify.Create == fsnotify.Create {
 				// Check if it's a directory
 				if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
-					// Skip hidden directories
-					if filepath.Base(event.Name)[0] != '.' {
-						lr.watchDirectory(event.Name)
+					base := filepath.Base(event.Name)
+					// Skip hidden and heavy directories
+					if base[0] != '.' && !skipDirs[base] {
+						lr.watchDirectory(event.Name, 1)
 					}
 				}
 			}

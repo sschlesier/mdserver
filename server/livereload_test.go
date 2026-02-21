@@ -148,6 +148,96 @@ func TestLiveReloadIntegration(t *testing.T) {
 	}
 }
 
+func TestEnsureWatchingDeepDirectory(t *testing.T) {
+	// Create a temporary directory with a deeply nested structure
+	tmpDir, err := os.MkdirTemp("", "mdserver-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create a directory 6 levels deep (beyond the initial depth of 3)
+	deepDir := filepath.Join(tmpDir, "a", "b", "c", "d", "e", "f")
+	if err := os.MkdirAll(deepDir, 0755); err != nil {
+		t.Fatalf("Failed to create deep directory: %v", err)
+	}
+
+	// Find an available port
+	port, err := findAvailablePort()
+	if err != nil {
+		t.Fatalf("Failed to find available port: %v", err)
+	}
+
+	// Create and configure server
+	config := Config{
+		Host:             "localhost",
+		Port:             port,
+		RootDir:          tmpDir,
+		EnableLiveReload: true,
+	}
+
+	srv := NewServer(config)
+	if srv.liveReload == nil {
+		t.Fatal("LiveReload was not initialized")
+	}
+
+	// Start server in a goroutine
+	go func() {
+		_ = srv.Start()
+	}()
+
+	// Give server time to start
+	time.Sleep(100 * time.Millisecond)
+
+	defer func() {
+		srv.Stop()
+		time.Sleep(50 * time.Millisecond)
+	}()
+
+	// Connect to WebSocket
+	wsURL := "ws://localhost:" + strconv.Itoa(port) + "/livereload"
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("Failed to connect to WebSocket: %v", err)
+	}
+	defer conn.Close()
+	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+
+	// Wait for connection to register
+	time.Sleep(100 * time.Millisecond)
+
+	// Write a .md file in the deep directory — should NOT trigger reload
+	// because initial watch depth is 3 (covers a/b/c but not d/e/f)
+	deepFile := filepath.Join(deepDir, "test.md")
+	if err := os.WriteFile(deepFile, []byte("# Deep Test\n"), 0644); err != nil {
+		t.Fatalf("Failed to write deep file: %v", err)
+	}
+
+	// Wait briefly and check no message arrives
+	time.Sleep(300 * time.Millisecond)
+
+	// Now call EnsureWatching on the deep directory
+	srv.liveReload.EnsureWatching(deepDir)
+
+	// Wait for watcher to settle
+	time.Sleep(100 * time.Millisecond)
+
+	// Modify the file — should now trigger a reload
+	if err := os.WriteFile(deepFile, []byte("# Deep Test Updated\n"), 0644); err != nil {
+		t.Fatalf("Failed to update deep file: %v", err)
+	}
+
+	// Read message from WebSocket
+	_, message, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("Failed to read WebSocket message after EnsureWatching: %v", err)
+	}
+
+	if string(message) != "reload" {
+		t.Errorf("Expected 'reload' message, got %q", string(message))
+	}
+}
+
 func TestLiveReloadMultipleClients(t *testing.T) {
 	// Create a temporary directory for the test
 	tmpDir, err := os.MkdirTemp("", "mdserver-test-*")
