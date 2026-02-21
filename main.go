@@ -6,8 +6,10 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"syscall"
 
 	"mdserver/renderer"
@@ -29,6 +31,7 @@ func main() {
 		livereload  = flag.Bool("livereload", true, "Enable live reload (default: true)")
 		showVersion = flag.Bool("version", false, "Show version information")
 		render      = flag.Bool("render", false, "Render markdown to HTML and output to stdout")
+		noOpen      = flag.Bool("no-open", false, "Don't open browser on startup")
 	)
 	flag.BoolVar(render, "r", false, "Render markdown to HTML and output to stdout (shorthand)")
 	flag.Parse()
@@ -124,9 +127,32 @@ func main() {
 	log.Printf("Server running at %s", url)
 	log.Println("Press Ctrl+C to stop")
 
+	if !*noOpen {
+		go openBrowser(url)
+	}
+
 	// Start server
 	if err := srv.Start(); err != nil {
 		log.Fatalf("Server failed: %v", err)
+	}
+}
+
+// openBrowser opens the given URL in the default browser.
+func openBrowser(url string) {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", url)
+	case "linux":
+		cmd = exec.Command("xdg-open", url)
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "start", url)
+	default:
+		log.Printf("Warning: don't know how to open browser on %s", runtime.GOOS)
+		return
+	}
+	if err := cmd.Start(); err != nil {
+		log.Printf("Warning: failed to open browser: %v", err)
 	}
 }
 
