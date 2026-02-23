@@ -44,6 +44,6 @@ mdserver --version
 - `--port` - Port to bind to (default: 0 for auto-selection)
 - `--file` - Specific markdown file to serve (optional)
 - `--dir` - Directory to serve (default: current working directory)
-- `--livereload` - Enable live reload (default: true)
+- `--live-reload` - Enable live reload (default: true)
 - `--version` - Show version information and exit
 

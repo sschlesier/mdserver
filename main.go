@@ -28,7 +28,7 @@ func main() {
 		port        = flag.Int("port", 0, "Port to bind to (0 for auto-selection)")
 		file        = flag.String("file", "", "Specific markdown file to serve (optional)")
 		dir         = flag.String("dir", ".", "Directory to serve")
-		livereload  = flag.Bool("livereload", true, "Enable live reload (default: true)")
+		livereload  = flag.Bool("live-reload", true, "Enable live reload (default: true)")
 		showVersion = flag.Bool("version", false, "Show version information")
 		render      = flag.Bool("render", false, "Render markdown to HTML and output to stdout")
 		noOpen      = flag.Bool("no-open", false, "Don't open browser on startup")
