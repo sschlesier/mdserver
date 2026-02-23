@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.0.0
+
+- **Breaking:** Rename `--livereload` flag to `--live-reload` for GNU/POSIX consistency
+- Add settings page with server shutdown and file watcher management
+- Update README with all flags and show `--` prefix in help output
+- Add `/release` slash command for automated release workflow
+
 ## v1.3.2
 
 - Auto-open browser on startup; use `--no-open` flag to disable
