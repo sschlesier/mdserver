@@ -28,12 +28,26 @@ func main() {
 		port        = flag.Int("port", 0, "Port to bind to (0 for auto-selection)")
 		file        = flag.String("file", "", "Specific markdown file to serve (optional)")
 		dir         = flag.String("dir", ".", "Directory to serve")
-		livereload  = flag.Bool("live-reload", true, "Enable live reload (default: true)")
+		livereload  = flag.Bool("live-reload", true, "Enable live reload")
 		showVersion = flag.Bool("version", false, "Show version information")
 		render      = flag.Bool("render", false, "Render markdown to HTML and output to stdout")
 		noOpen      = flag.Bool("no-open", false, "Don't open browser on startup")
 	)
 	flag.BoolVar(render, "r", false, "Render markdown to HTML and output to stdout (shorthand)")
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: mdserver [flags] [file]\n\nFlags:\n")
+		flag.VisitAll(func(f *flag.Flag) {
+			prefix := "--"
+			if len(f.Name) == 1 {
+				prefix = "-"
+			}
+			defVal := ""
+			if f.DefValue != "" && f.DefValue != "false" && f.DefValue != "0" {
+				defVal = fmt.Sprintf(" (default: %s)", f.DefValue)
+			}
+			fmt.Fprintf(os.Stderr, "  %s%s\t%s%s\n", prefix, f.Name, f.Usage, defVal)
+		})
+	}
 	flag.Parse()
 
 	// Handle version flag

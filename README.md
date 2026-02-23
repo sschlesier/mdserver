@@ -40,10 +40,12 @@ mdserver --version
 
 ## Flags
 
-- `--host` - Host to bind to (default: "localhost")
-- `--port` - Port to bind to (default: 0 for auto-selection)
-- `--file` - Specific markdown file to serve (optional)
 - `--dir` - Directory to serve (default: current working directory)
+- `--file` - Specific markdown file to serve (optional)
+- `--host` - Host to bind to (default: "localhost")
 - `--live-reload` - Enable live reload (default: true)
+- `--no-open` - Don't open browser on startup
+- `--port` - Port to bind to (default: 0 for auto-selection)
+- `--render`, `-r` - Render markdown to HTML and output to stdout
 - `--version` - Show version information and exit
 
