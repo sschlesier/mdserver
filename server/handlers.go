@@ -9,9 +9,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"mdserver/renderer"
 )
+
+// settingsGearIcon is the SVG markup for the settings gear icon used in breadcrumbs.
+const settingsGearIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`
 
 // Breadcrumb represents a single breadcrumb navigation item
 type Breadcrumb struct {
@@ -405,7 +409,10 @@ func (s *Server) getDefaultTemplate() (*template.Template, error) {
 	<div class="container">
 		{{if .Breadcrumbs}}
 		<nav class="breadcrumbs">
-			{{range $index, $crumb := .Breadcrumbs}}{{if $index}}    {{end}}<a href="{{$crumb.Href}}">{{$crumb.Text}}</a>{{end}}
+			<span class="breadcrumb-links">
+				{{range $index, $crumb := .Breadcrumbs}}{{if $index}}    {{end}}<a href="{{$crumb.Href}}">{{$crumb.Text}}</a>{{end}}
+			</span>
+			<a href="/settings" class="settings-icon" title="Settings">` + settingsGearIcon + `</a>
 		</nav>
 		{{end}}
 		{{.Content}}
@@ -441,7 +448,10 @@ func (s *Server) getDefaultDirectoryTemplate() (*template.Template, error) {
 <body>
 	<div class="container">
 		<nav class="breadcrumbs">
-			{{range $index, $crumb := .Breadcrumbs}}{{if $index}}    {{end}}<a href="{{$crumb.Href}}">{{$crumb.Text}}</a>{{end}}
+			<span class="breadcrumb-links">
+				{{range $index, $crumb := .Breadcrumbs}}{{if $index}}    {{end}}<a href="{{$crumb.Href}}">{{$crumb.Text}}</a>{{end}}
+			</span>
+			<a href="/settings" class="settings-icon" title="Settings">` + settingsGearIcon + `</a>
 		</nav>
 		<h1>{{.Title}}</h1>
 		<ul class="directory-listing">
@@ -462,6 +472,204 @@ func (s *Server) getDefaultDirectoryTemplate() (*template.Template, error) {
 	}
 
 	return template.New("directory").Parse(tmplStr)
+}
+
+// WatchedDir represents a watched directory for the settings page.
+type WatchedDir struct {
+	Path    string
+	Display string
+	IsRoot  bool
+}
+
+// handleSettings renders the settings page.
+func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	breadcrumbs := []Breadcrumb{
+		{Href: "/", Text: template.HTML(`<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="vertical-align: middle; display: inline-block;"><path d="M8 0L0 7h2v9h5v-6h2v6h5V7h2L8 0z"/></svg>/`)},
+		{Href: "/settings", Text: "Settings"},
+	}
+
+	var watchedDirs []WatchedDir
+	liveReloadEnabled := s.liveReload != nil
+
+	if liveReloadEnabled {
+		absRoot, _ := filepath.Abs(s.config.RootDir)
+		for _, dir := range s.liveReload.WatchedDirs() {
+			rel, err := filepath.Rel(absRoot, dir)
+			if err != nil {
+				rel = dir
+			}
+			isRoot := dir == absRoot
+			display := rel
+			if isRoot {
+				display = "."
+			}
+			watchedDirs = append(watchedDirs, WatchedDir{
+				Path:    dir,
+				Display: display,
+				IsRoot:  isRoot,
+			})
+		}
+	}
+
+	tmpl, err := s.loadSettingsTemplate()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to load template: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	data := struct {
+		Title              string
+		Breadcrumbs        []Breadcrumb
+		WatchedDirs        []WatchedDir
+		LiveReloadEnabled  bool
+	}{
+		Title:             "Settings",
+		Breadcrumbs:       breadcrumbs,
+		WatchedDirs:       watchedDirs,
+		LiveReloadEnabled: liveReloadEnabled,
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := tmpl.Execute(w, data); err != nil {
+		log.Printf("Template execution error: %v", err)
+	}
+}
+
+// handleShutdown shuts down the server.
+func (s *Server) handleShutdown(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write([]byte(`<!DOCTYPE html><html><head><title>Shutting Down</title><link rel="stylesheet" href="/assets/style.css"></head><body><div class="container"><h1>Server shutting down...</h1><p>You can close this tab.</p></div></body></html>`))
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
+
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		os.Exit(0)
+	}()
+}
+
+// handleRemoveWatch removes a watched directory.
+func (s *Server) handleRemoveWatch(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	dir := r.FormValue("dir")
+	if dir == "" {
+		http.Error(w, "Missing dir parameter", http.StatusBadRequest)
+		return
+	}
+
+	// Reject removal of root directory
+	absRoot, _ := filepath.Abs(s.config.RootDir)
+	if dir == absRoot {
+		http.Error(w, "Cannot remove root directory watcher", http.StatusBadRequest)
+		return
+	}
+
+	if s.liveReload != nil {
+		if err := s.liveReload.RemoveWatch(dir); err != nil {
+			log.Printf("Failed to remove watch on %s: %v", dir, err)
+		}
+	}
+
+	http.Redirect(w, r, "/settings", http.StatusSeeOther)
+}
+
+// loadSettingsTemplate loads the settings page template.
+func (s *Server) loadSettingsTemplate() (*template.Template, error) {
+	exePath, err := os.Executable()
+	var templatePath string
+	if err == nil {
+		exeDir := filepath.Dir(exePath)
+		templatePath = filepath.Join(exeDir, "template", "settings.html")
+		if _, err := os.Stat(templatePath); os.IsNotExist(err) {
+			templatePath = "template/settings.html"
+		}
+	} else {
+		templatePath = "template/settings.html"
+	}
+
+	tmplContent, err := os.ReadFile(templatePath)
+	if err != nil {
+		return s.getDefaultSettingsTemplate()
+	}
+
+	tmplContentStr := string(tmplContent)
+	if s.config.EnableLiveReload {
+		tmplContentStr = s.injectLiveReloadScript(tmplContentStr)
+	}
+
+	return template.New("settings").Parse(tmplContentStr)
+}
+
+// getDefaultSettingsTemplate returns a default settings page template.
+func (s *Server) getDefaultSettingsTemplate() (*template.Template, error) {
+	tmpl := `<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>{{.Title}}</title>
+	<link rel="icon" type="image/svg+xml" href="/favicon.ico">
+	<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+	<link rel="apple-touch-icon" href="/favicon.ico">
+	<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+	<div class="container">
+		<nav class="breadcrumbs">
+			<span class="breadcrumb-links">
+				{{range $index, $crumb := .Breadcrumbs}}{{if $index}}    {{end}}<a href="{{$crumb.Href}}">{{$crumb.Text}}</a>{{end}}
+			</span>
+		</nav>
+		<h1>Settings</h1>
+		<div class="settings-section">
+			<h2>Server</h2>
+			<form method="POST" action="/settings/shutdown" onsubmit="return confirm('Are you sure you want to shut down the server?');">
+				<button type="submit" class="shutdown-btn">` + `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>` + ` Shut Down Server</button>
+			</form>
+		</div>
+		{{if .LiveReloadEnabled}}
+		<div class="settings-section">
+			<h2>Watched Directories</h2>
+			<div class="watched-dirs-list">
+				{{range .WatchedDirs}}
+				<div class="watched-dir-row">
+					<span class="watched-dir-path">{{.Display}}</span>
+					{{if .IsRoot}}<span class="root-badge">root</span>{{else}}
+					<form method="POST" action="/settings/remove-watch" style="display:inline;">
+						<input type="hidden" name="dir" value="{{.Path}}">
+						<button type="submit" class="remove-watch-btn">Remove</button>
+					</form>
+					{{end}}
+				</div>
+				{{end}}
+			</div>
+		</div>
+		{{end}}
+	</div>
+</body>
+</html>`
+
+	tmplStr := tmpl
+	if s.config.EnableLiveReload {
+		tmplStr = s.injectLiveReloadScript(tmplStr)
+	}
+
+	return template.New("settings").Parse(tmplStr)
 }
 
 // extractTitle extracts title from markdown content or uses filename

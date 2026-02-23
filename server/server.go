@@ -78,6 +78,11 @@ func (s *Server) setupRoutes() {
 		s.mux.HandleFunc("/livereload", s.liveReload.HandleWebSocket)
 	}
 
+	// Settings routes
+	s.mux.HandleFunc("/settings", s.handleSettings)
+	s.mux.HandleFunc("/settings/shutdown", s.handleShutdown)
+	s.mux.HandleFunc("/settings/remove-watch", s.handleRemoveWatch)
+
 	// Root handler - handles all other routes including root and markdown files
 	s.mux.HandleFunc("/", s.handleRequest)
 }

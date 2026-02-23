@@ -192,33 +192,57 @@ hr {
 
 /* Breadcrumb Navigation */
 .breadcrumbs {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
 	margin-bottom: 1.5em;
 	padding-bottom: 0.5em;
 	border-bottom: 1px solid var(--border-color);
 	font-size: 0.95em;
 }
 
-.breadcrumbs a {
+.breadcrumb-links {
+	flex: 1;
+	min-width: 0;
+}
+
+.breadcrumb-links a {
 	color: var(--link-color);
 	text-decoration: none;
 	margin-right: 0.25em;
 }
 
-.breadcrumbs a:first-child {
+.breadcrumb-links a:first-child {
 	padding: 4px 6px;
 	display: inline-block;
 }
 
-.breadcrumbs a:hover {
+.breadcrumb-links a:hover {
 	color: var(--link-hover);
 	text-decoration: underline;
 }
 
-.breadcrumbs a:not(:last-child)::after {
+.breadcrumb-links a:not(:last-child)::after {
 	content: " ";
 	margin-left: 0.25em;
 	color: var(--text-color);
 	opacity: 0.5;
+}
+
+.settings-icon {
+	display: inline-flex;
+	align-items: center;
+	padding: 4px;
+	opacity: 0.5;
+	color: var(--text-color);
+	transition: opacity 0.2s;
+	flex-shrink: 0;
+}
+
+.settings-icon:hover {
+	opacity: 1;
+	color: var(--link-color);
+	text-decoration: none;
 }
 
 /* Directory Listing */
@@ -256,6 +280,83 @@ hr {
 .directory-listing a:hover {
 	color: var(--link-hover);
 	text-decoration: underline;
+}
+
+/* Settings Page */
+.settings-section {
+	margin: 2em 0;
+}
+
+.settings-section h2 {
+	font-size: 1.25em;
+	margin-bottom: 0.75em;
+}
+
+.shutdown-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5em;
+	background: #dc3545;
+	color: #fff;
+	border: none;
+	border-radius: 5px;
+	padding: 8px 16px;
+	font-size: 0.95em;
+	cursor: pointer;
+	transition: background 0.2s;
+}
+
+.shutdown-btn:hover {
+	background: #c82333;
+}
+
+.watched-dirs-list {
+	border: 1px solid var(--border-color);
+	border-radius: 5px;
+	overflow: hidden;
+}
+
+.watched-dir-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--border-color);
+}
+
+.watched-dir-row:last-child {
+	border-bottom: none;
+}
+
+.watched-dir-path {
+	font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+	font-size: 0.9em;
+}
+
+.root-badge {
+	background: var(--code-bg);
+	border: 1px solid var(--border-color);
+	border-radius: 3px;
+	padding: 2px 8px;
+	font-size: 0.8em;
+	color: var(--text-color);
+	opacity: 0.7;
+}
+
+.remove-watch-btn {
+	background: none;
+	border: 1px solid var(--border-color);
+	border-radius: 3px;
+	padding: 2px 10px;
+	font-size: 0.85em;
+	color: var(--text-color);
+	cursor: pointer;
+	transition: border-color 0.2s, color 0.2s;
+}
+
+.remove-watch-btn:hover {
+	border-color: #dc3545;
+	color: #dc3545;
 }
 
 /* Responsive */

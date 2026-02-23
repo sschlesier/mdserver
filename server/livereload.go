@@ -1,10 +1,12 @@
 package server
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
@@ -236,6 +238,35 @@ func (lr *LiveReload) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}()
+}
+
+// WatchedDirs returns a sorted list of all currently watched directories.
+func (lr *LiveReload) WatchedDirs() []string {
+	lr.watchedMu.Lock()
+	defer lr.watchedMu.Unlock()
+
+	dirs := make([]string, 0, len(lr.watched))
+	for dir := range lr.watched {
+		dirs = append(dirs, dir)
+	}
+	sort.Strings(dirs)
+	return dirs
+}
+
+// RemoveWatch stops watching the given directory.
+func (lr *LiveReload) RemoveWatch(dir string) error {
+	lr.watchedMu.Lock()
+	defer lr.watchedMu.Unlock()
+
+	if !lr.watched[dir] {
+		return fmt.Errorf("directory not watched: %s", dir)
+	}
+
+	if err := lr.watcher.Remove(dir); err != nil {
+		return err
+	}
+	delete(lr.watched, dir)
+	return nil
 }
 
 // Stop stops the file watcher and closes all connections

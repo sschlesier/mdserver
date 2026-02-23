@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>{{.Title}}</title>
+	<link rel="icon" type="image/svg+xml" href="/favicon.ico">
+	<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+	<link rel="apple-touch-icon" href="/favicon.ico">
+	<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+	<div class="container">
+		<nav class="breadcrumbs">
+			<span class="breadcrumb-links">
+				{{range $index, $crumb := .Breadcrumbs}}{{if $index}}    {{end}}<a href="{{$crumb.Href}}">{{$crumb.Text}}</a>{{end}}
+			</span>
+		</nav>
+		<h1>Settings</h1>
+		<div class="settings-section">
+			<h2>Server</h2>
+			<form method="POST" action="/settings/shutdown" onsubmit="return confirm('Are you sure you want to shut down the server?');">
+				<button type="submit" class="shutdown-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg> Shut Down Server</button>
+			</form>
+		</div>
+		{{if .LiveReloadEnabled}}
+		<div class="settings-section">
+			<h2>Watched Directories</h2>
+			<div class="watched-dirs-list">
+				{{range .WatchedDirs}}
+				<div class="watched-dir-row">
+					<span class="watched-dir-path">{{.Display}}</span>
+					{{if .IsRoot}}<span class="root-badge">root</span>{{else}}
+					<form method="POST" action="/settings/remove-watch" style="display:inline;">
+						<input type="hidden" name="dir" value="{{.Path}}">
+						<button type="submit" class="remove-watch-btn">Remove</button>
+					</form>
+					{{end}}
+				</div>
+				{{end}}
+			</div>
+		</div>
+		{{end}}
+	</div>
+</body>
+</html>
