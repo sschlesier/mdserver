@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.0.1
+
+- Fix live reload for atomic saves (editors that write via temp file + rename)
+
 ## v2.0.0
 
 - **Breaking:** Rename `--livereload` flag to `--live-reload` for GNU/POSIX consistency
