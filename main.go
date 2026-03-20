@@ -29,6 +29,7 @@ func main() {
 		file        = flag.String("file", "", "Specific markdown file to serve (optional)")
 		dir         = flag.String("dir", ".", "Directory to serve")
 		livereload  = flag.Bool("live-reload", true, "Enable live reload")
+		verbose     = flag.Bool("verbose", false, "Enable verbose watcher and live reload diagnostics")
 		showVersion = flag.Bool("version", false, "Show version information")
 		render      = flag.Bool("render", false, "Render markdown to HTML and output to stdout")
 		noOpen      = flag.Bool("no-open", false, "Don't open browser on startup")
@@ -116,6 +117,7 @@ func main() {
 		RootDir:          rootDir,
 		File:             *file,
 		EnableLiveReload: *livereload,
+		Verbose:          *verbose,
 	}
 
 	// Initialize and start server

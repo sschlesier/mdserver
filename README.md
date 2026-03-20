@@ -26,6 +26,9 @@ mdserver --host localhost --port 8080
 # Auto-select available port (default)
 mdserver --port 0
 
+# Enable verbose watcher diagnostics
+mdserver --verbose
+
 # Show version information
 mdserver --version
 ```
@@ -47,5 +50,5 @@ mdserver --version
 - `--no-open` - Don't open browser on startup
 - `--port` - Port to bind to (default: 0 for auto-selection)
 - `--render`, `-r` - Render markdown to HTML and output to stdout
+- `--verbose` - Enable verbose watcher and live reload diagnostics
 - `--version` - Show version information and exit
-

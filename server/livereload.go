@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
@@ -30,6 +31,7 @@ var skipDirs = map[string]bool{
 // LiveReload manages file watching and WebSocket connections for live reload
 type LiveReload struct {
 	rootDir   string
+	verbose   bool
 	watcher   *fsnotify.Watcher
 	clients   map[*websocket.Conn]bool
 	clientsMu sync.RWMutex
@@ -40,7 +42,7 @@ type LiveReload struct {
 }
 
 // NewLiveReload creates a new LiveReload instance
-func NewLiveReload(rootDir string) (*LiveReload, error) {
+func NewLiveReload(rootDir string, verbose bool) (*LiveReload, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
@@ -48,6 +50,7 @@ func NewLiveReload(rootDir string) (*LiveReload, error) {
 
 	lr := &LiveReload{
 		rootDir:   rootDir,
+		verbose:   verbose,
 		watcher:   watcher,
 		clients:   make(map[*websocket.Conn]bool),
 		watched:   make(map[string]bool),
@@ -151,12 +154,11 @@ func (lr *LiveReload) watchFiles() {
 			if !ok {
 				return
 			}
-			// Only reload on write events for .md files
-			if event.Op&fsnotify.Write == fsnotify.Write {
-				if filepath.Ext(event.Name) == ".md" {
-					// log.Printf("LiveReload: File changed: %s", event.Name)
-					lr.broadcast <- []byte("reload")
-				}
+			isMarkdown := strings.EqualFold(filepath.Ext(event.Name), ".md")
+			shouldReload := isMarkdown && event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename) != 0
+			lr.verbosef("LiveReload: event path=%s op=%s markdown=%t reload=%t", event.Name, event.Op.String(), isMarkdown, shouldReload)
+			if shouldReload {
+				lr.broadcastReload(event.Name, event.Op.String())
 			}
 			// Handle new directories being created
 			if event.Op&fsnotify.Create == fsnotify.Create {
@@ -185,6 +187,7 @@ func (lr *LiveReload) broadcastMessages() {
 	for {
 		select {
 		case message := <-lr.broadcast:
+			lr.verbosef("LiveReload: broadcasting %q to %d clients", string(message), len(lr.clients))
 			lr.clientsMu.RLock()
 			for client := range lr.clients {
 				err := client.WriteMessage(websocket.TextMessage, message)
@@ -202,6 +205,17 @@ func (lr *LiveReload) broadcastMessages() {
 		case <-lr.stopChan:
 			return
 		}
+	}
+}
+
+func (lr *LiveReload) broadcastReload(path, op string) {
+	lr.verbosef("LiveReload: queue reload path=%s op=%s", path, op)
+	lr.broadcast <- []byte("reload")
+}
+
+func (lr *LiveReload) verbosef(format string, args ...any) {
+	if lr.verbose {
+		log.Printf(format, args...)
 	}
 }
 

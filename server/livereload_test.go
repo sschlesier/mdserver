@@ -287,7 +287,7 @@ func TestLiveReloadMultipleClients(t *testing.T) {
 
 	// Connect multiple WebSocket clients
 	wsURL := "ws://localhost:" + strconv.Itoa(port) + "/livereload"
-	
+
 	conn1, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
 		t.Fatalf("Failed to connect first client: %v", err)
@@ -358,5 +358,94 @@ func TestLiveReloadMultipleClients(t *testing.T) {
 		t.Errorf("Client 2 error: %v", err)
 	case <-time.After(2 * time.Second):
 		t.Error("Client 2: Timeout waiting for reload message")
+	}
+}
+
+func TestLiveReloadAtomicSaveRename(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "mdserver-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	initialContent := "# Test Page\n\nInitial content.\n"
+	if err := os.WriteFile(testFile, []byte(initialContent), 0644); err != nil {
+		t.Fatalf("Failed to write test file: %v", err)
+	}
+
+	port, err := findAvailablePort()
+	if err != nil {
+		t.Fatalf("Failed to find available port: %v", err)
+	}
+
+	config := Config{
+		Host:             "localhost",
+		Port:             port,
+		RootDir:          tmpDir,
+		EnableLiveReload: true,
+	}
+
+	srv := NewServer(config)
+	if srv.liveReload == nil {
+		t.Fatal("LiveReload was not initialized")
+	}
+
+	go func() {
+		_ = srv.Start()
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+
+	defer func() {
+		srv.Stop()
+		time.Sleep(50 * time.Millisecond)
+	}()
+
+	baseURL := "http://localhost:" + strconv.Itoa(port)
+	resp, err := http.Get(baseURL + "/test.md")
+	if err != nil {
+		t.Fatalf("Failed to fetch test file: %v", err)
+	}
+	resp.Body.Close()
+
+	wsURL := "ws://localhost:" + strconv.Itoa(port) + "/livereload"
+	conn, resp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("Failed to connect to WebSocket: %v", err)
+	}
+	defer conn.Close()
+	defer resp.Body.Close()
+	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+
+	tempFile := filepath.Join(tmpDir, "test.md.tmp")
+	updatedContent := "# Test Page\n\nUpdated via atomic save.\n"
+	if err := os.WriteFile(tempFile, []byte(updatedContent), 0644); err != nil {
+		t.Fatalf("Failed to write temp file: %v", err)
+	}
+	if err := os.Rename(tempFile, testFile); err != nil {
+		t.Fatalf("Failed to rename temp file over test file: %v", err)
+	}
+
+	_, message, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("Failed to read WebSocket message after atomic save: %v", err)
+	}
+	if string(message) != "reload" {
+		t.Errorf("Expected 'reload' message, got %q", string(message))
+	}
+
+	resp2, err := http.Get(baseURL + "/test.md")
+	if err != nil {
+		t.Fatalf("Failed to fetch updated file: %v", err)
+	}
+	defer resp2.Body.Close()
+
+	body2, err := io.ReadAll(resp2.Body)
+	if err != nil {
+		t.Fatalf("Failed to read updated response body: %v", err)
+	}
+	if !strings.Contains(string(body2), "Updated via atomic save") {
+		t.Errorf("Updated content not found in response. Got: %s", string(body2))
 	}
 }

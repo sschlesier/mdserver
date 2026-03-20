@@ -16,6 +16,7 @@ type Config struct {
 	RootDir          string
 	File             string
 	EnableLiveReload bool
+	Verbose          bool
 }
 
 // Server represents the HTTP server
@@ -35,7 +36,7 @@ func NewServer(config Config) *Server {
 	// Initialize LiveReload if enabled
 	if config.EnableLiveReload {
 		var err error
-		s.liveReload, err = NewLiveReload(config.RootDir)
+		s.liveReload, err = NewLiveReload(config.RootDir, config.Verbose)
 		if err != nil {
 			log.Printf("Failed to initialize LiveReload: %v", err)
 		} else {
