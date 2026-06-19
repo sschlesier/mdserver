@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.0.2
+
+- Fix settings icon right-alignment in Firefox
+- Add spacing between home icon and path in breadcrumb navigation
+
 ## v2.0.1
 
 - Fix live reload for atomic saves (editors that write via temp file + rename)
