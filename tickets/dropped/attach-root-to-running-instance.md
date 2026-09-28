@@ -114,3 +114,7 @@ Decisions:
 
 Stop and ask if: the instance-file approach doesn't work on one of macOS, Linux or
 Windows. Also stop if the token check would need to be relaxed for any reason.
+
+## Log
+
+- 2026-09-28: Dropped: complications (especially rewriting root-relative links in Markdown) aren't worth the trouble. Decided by Scott Schlesier.

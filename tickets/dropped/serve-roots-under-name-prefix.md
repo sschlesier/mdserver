@@ -126,3 +126,7 @@ Decisions:
 
 Stop and ask if: a route, template or test outside those named here depends on
 `/`-rooted file URLs in a way the legacy redirect doesn't cover.
+
+## Log
+
+- 2026-09-28: Dropped: complications (especially rewriting root-relative links in Markdown) aren't worth the trouble. Decided by Scott Schlesier.
