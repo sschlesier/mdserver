@@ -1,13 +1,23 @@
 package server
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"html"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 )
+
+// ErrRootMissing is returned by Start when the server shut itself down
+// because the root directory no longer exists.
+var ErrRootMissing = errors.New("root directory no longer exists")
 
 // Config holds server configuration
 type Config struct {
@@ -24,13 +34,24 @@ type Server struct {
 	config     Config
 	mux        *http.ServeMux
 	liveReload *LiveReload
+	httpServer *http.Server
+
+	rootGone     chan struct{}
+	rootGoneOnce sync.Once
+	shutdownDone chan struct{}
 }
 
 // NewServer creates a new server instance
 func NewServer(config Config) *Server {
 	s := &Server{
-		config: config,
-		mux:    http.NewServeMux(),
+		config:       config,
+		mux:          http.NewServeMux(),
+		rootGone:     make(chan struct{}),
+		shutdownDone: make(chan struct{}),
+	}
+	s.httpServer = &http.Server{
+		Addr:    fmt.Sprintf("%s:%d", config.Host, config.Port),
+		Handler: s.requireRoot(s.mux),
 	}
 
 	// Initialize LiveReload if enabled
@@ -40,6 +61,11 @@ func NewServer(config Config) *Server {
 		if err != nil {
 			log.Printf("Failed to initialize LiveReload: %v", err)
 		} else {
+			s.liveReload.onRootRemoved = func() {
+				if !s.rootExists() {
+					s.shutdownRootMissing()
+				}
+			}
 			if err := s.liveReload.Start(); err != nil {
 				log.Printf("Failed to start LiveReload: %v", err)
 				s.liveReload = nil
@@ -51,11 +77,18 @@ func NewServer(config Config) *Server {
 	return s
 }
 
-// Start starts the HTTP server
+// Start starts the HTTP server. It returns ErrRootMissing if the server shut
+// itself down because the root directory disappeared.
 func (s *Server) Start() error {
-	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
-	log.Printf("Listening on %s", addr)
-	return http.ListenAndServe(addr, s.mux)
+	log.Printf("Listening on %s", s.httpServer.Addr)
+	err := s.httpServer.ListenAndServe()
+	select {
+	case <-s.rootGone:
+		<-s.shutdownDone
+		return ErrRootMissing
+	default:
+		return err
+	}
 }
 
 // Stop stops the server and cleans up resources
@@ -63,6 +96,46 @@ func (s *Server) Stop() {
 	if s.liveReload != nil {
 		s.liveReload.Stop()
 	}
+}
+
+// rootExists reports whether the root directory is still present. Errors
+// other than "not exist" (e.g. permissions) are treated as present.
+func (s *Server) rootExists() bool {
+	info, err := os.Stat(s.config.RootDir)
+	if err != nil {
+		return !errors.Is(err, fs.ErrNotExist)
+	}
+	return info.IsDir()
+}
+
+// requireRoot answers every request with a shutdown notice once the root
+// directory is gone, then shuts the server down.
+func (s *Server) requireRoot(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.rootExists() {
+			next.ServeHTTP(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Connection", "close")
+		w.WriteHeader(http.StatusGone)
+		fmt.Fprintf(w, `<!DOCTYPE html><html><head><title>Folder Missing</title></head><body style="font-family: sans-serif; margin: 3em;"><h1>Folder missing</h1><p><code>%s</code> no longer exists. The server is shutting down.</p><p>You can close this tab.</p></body></html>`, html.EscapeString(s.config.RootDir))
+		s.shutdownRootMissing()
+	})
+}
+
+// shutdownRootMissing gracefully stops the HTTP server, letting in-flight
+// responses (including the shutdown notice) finish.
+func (s *Server) shutdownRootMissing() {
+	s.rootGoneOnce.Do(func() {
+		close(s.rootGone)
+		go func() {
+			defer close(s.shutdownDone)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			s.httpServer.Shutdown(ctx)
+		}()
+	})
 }
 
 // setupRoutes configures all HTTP routes

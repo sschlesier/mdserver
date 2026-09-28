@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -149,6 +150,11 @@ func main() {
 
 	// Start server
 	if err := srv.Start(); err != nil {
+		if errors.Is(err, server.ErrRootMissing) {
+			log.Printf("Directory %s no longer exists; shutting down", rootDir)
+			srv.Stop()
+			os.Exit(0)
+		}
 		log.Fatalf("Server failed: %v", err)
 	}
 }
