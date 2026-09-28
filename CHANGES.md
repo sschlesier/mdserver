@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.1.0
+
+- Shut down when the served directory is deleted or moved: the next request gets a "folder missing, shutting down" page, and with live reload on the server exits as soon as the file watcher notices
+
 ## v2.0.2
 
 - Fix settings icon right-alignment in Firefox
