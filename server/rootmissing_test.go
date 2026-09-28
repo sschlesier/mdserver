@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func startRootTestServer(t *testing.T, poll time.Duration) (string, string, chan error) {
+func startRootTestServer(t *testing.T, liveReload bool) (string, string, chan error) {
 	t.Helper()
 	tmpDir, err := os.MkdirTemp("", "mdserver-root-*")
 	if err != nil {
@@ -24,8 +24,7 @@ func startRootTestServer(t *testing.T, poll time.Duration) (string, string, chan
 		t.Fatalf("Failed to find available port: %v", err)
 	}
 
-	srv := NewServer(Config{Host: "localhost", Port: port, RootDir: tmpDir})
-	srv.rootPollInterval = poll
+	srv := NewServer(Config{Host: "localhost", Port: port, RootDir: tmpDir, EnableLiveReload: liveReload})
 	t.Cleanup(srv.Stop)
 
 	done := make(chan error, 1)
@@ -47,7 +46,7 @@ func waitForStart(t *testing.T, done chan error) error {
 }
 
 func TestRequestAfterRootRemovedRepliesAndShutsDown(t *testing.T) {
-	tmpDir, baseURL, done := startRootTestServer(t, time.Hour)
+	tmpDir, baseURL, done := startRootTestServer(t, false)
 
 	if err := os.RemoveAll(tmpDir); err != nil {
 		t.Fatalf("Failed to remove root: %v", err)
@@ -72,8 +71,8 @@ func TestRequestAfterRootRemovedRepliesAndShutsDown(t *testing.T) {
 	}
 }
 
-func TestRootRemovedWithoutRequestShutsDown(t *testing.T) {
-	tmpDir, _, done := startRootTestServer(t, 20*time.Millisecond)
+func TestRootRemovedWithoutRequestShutsDownViaWatcher(t *testing.T) {
+	tmpDir, _, done := startRootTestServer(t, true)
 
 	if err := os.RemoveAll(tmpDir); err != nil {
 		t.Fatalf("Failed to remove root: %v", err)
@@ -85,8 +84,7 @@ func TestRootRemovedWithoutRequestShutsDown(t *testing.T) {
 }
 
 func TestRootPresentKeepsServing(t *testing.T) {
-	_, baseURL, done := startRootTestServer(t, 20*time.Millisecond)
-	time.Sleep(100 * time.Millisecond)
+	_, baseURL, done := startRootTestServer(t, true)
 
 	resp, err := http.Get(baseURL + "/")
 	if err != nil {

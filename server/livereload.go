@@ -39,6 +39,10 @@ type LiveReload struct {
 	watchedMu sync.Mutex
 	broadcast chan []byte
 	stopChan  chan struct{}
+
+	// onRootRemoved, if set, is called when the root directory itself is
+	// removed or renamed.
+	onRootRemoved func()
 }
 
 // NewLiveReload creates a new LiveReload instance
@@ -159,6 +163,9 @@ func (lr *LiveReload) watchFiles() {
 			lr.verbosef("LiveReload: event path=%s op=%s markdown=%t reload=%t", event.Name, event.Op.String(), isMarkdown, shouldReload)
 			if shouldReload {
 				lr.broadcastReload(event.Name, event.Op.String())
+			}
+			if event.Name == lr.rootDir && event.Op&(fsnotify.Remove|fsnotify.Rename) != 0 && lr.onRootRemoved != nil {
+				lr.onRootRemoved()
 			}
 			// Handle new directories being created
 			if event.Op&fsnotify.Create == fsnotify.Create {

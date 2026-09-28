@@ -19,8 +19,6 @@ import (
 // because the root directory no longer exists.
 var ErrRootMissing = errors.New("root directory no longer exists")
 
-const defaultRootPollInterval = time.Second
-
 // Config holds server configuration
 type Config struct {
 	Host             string
@@ -38,23 +36,22 @@ type Server struct {
 	liveReload *LiveReload
 	httpServer *http.Server
 
-	rootPollInterval time.Duration
-	rootGone         chan struct{}
-	rootGoneOnce     sync.Once
-	shutdownDone     chan struct{}
-	stopChan         chan struct{}
-	stopOnce         sync.Once
+	rootGone     chan struct{}
+	rootGoneOnce sync.Once
+	shutdownDone chan struct{}
 }
 
 // NewServer creates a new server instance
 func NewServer(config Config) *Server {
 	s := &Server{
-		config:           config,
-		mux:              http.NewServeMux(),
-		rootPollInterval: defaultRootPollInterval,
-		rootGone:         make(chan struct{}),
-		shutdownDone:     make(chan struct{}),
-		stopChan:         make(chan struct{}),
+		config:       config,
+		mux:          http.NewServeMux(),
+		rootGone:     make(chan struct{}),
+		shutdownDone: make(chan struct{}),
+	}
+	s.httpServer = &http.Server{
+		Addr:    fmt.Sprintf("%s:%d", config.Host, config.Port),
+		Handler: s.requireRoot(s.mux),
 	}
 
 	// Initialize LiveReload if enabled
@@ -64,6 +61,11 @@ func NewServer(config Config) *Server {
 		if err != nil {
 			log.Printf("Failed to initialize LiveReload: %v", err)
 		} else {
+			s.liveReload.onRootRemoved = func() {
+				if !s.rootExists() {
+					s.shutdownRootMissing()
+				}
+			}
 			if err := s.liveReload.Start(); err != nil {
 				log.Printf("Failed to start LiveReload: %v", err)
 				s.liveReload = nil
@@ -72,10 +74,6 @@ func NewServer(config Config) *Server {
 	}
 
 	s.setupRoutes()
-	s.httpServer = &http.Server{
-		Addr:    fmt.Sprintf("%s:%d", config.Host, config.Port),
-		Handler: s.requireRoot(s.mux),
-	}
 	return s
 }
 
@@ -83,7 +81,6 @@ func NewServer(config Config) *Server {
 // itself down because the root directory disappeared.
 func (s *Server) Start() error {
 	log.Printf("Listening on %s", s.httpServer.Addr)
-	go s.watchRoot()
 	err := s.httpServer.ListenAndServe()
 	select {
 	case <-s.rootGone:
@@ -96,7 +93,6 @@ func (s *Server) Start() error {
 
 // Stop stops the server and cleans up resources
 func (s *Server) Stop() {
-	s.stopOnce.Do(func() { close(s.stopChan) })
 	if s.liveReload != nil {
 		s.liveReload.Stop()
 	}
@@ -110,26 +106,6 @@ func (s *Server) rootExists() bool {
 		return !errors.Is(err, fs.ErrNotExist)
 	}
 	return info.IsDir()
-}
-
-// watchRoot polls for the root directory and shuts the server down if it
-// disappears while no request is in flight.
-func (s *Server) watchRoot() {
-	ticker := time.NewTicker(s.rootPollInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			if !s.rootExists() {
-				s.shutdownRootMissing()
-				return
-			}
-		case <-s.rootGone:
-			return
-		case <-s.stopChan:
-			return
-		}
-	}
 }
 
 // requireRoot answers every request with a shutdown notice once the root
