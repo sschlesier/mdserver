@@ -41,8 +41,8 @@ Out of scope:
 
 ## Verification
 
-- `go test ./...` and `go build .` pass.
-- New tests: the instance file is written with 0600 and removed on `Stop`. `/_mdserver/roots` covers auth (no token, wrong token, correct token), duplicate dir, bad dir, and GET → 405. Discovery skips a stale file with a dead PID and deletes it. The attach client talks to an `httptest` server (the client logic is factored out of `main` so it can be tested).
+- `go test ./...` and `go build .` pass. `GOOS=windows go build .` and `GOOS=linux go build .` also pass.
+- New tests: the instance file is written with 0600 and removed on `Stop`. `/_mdserver/roots` covers auth (no token, wrong token, correct token), duplicate dir, bad dir, and GET → 405. Discovery skips a stale file with a dead PID and deletes it. `/settings/shutdown` removes the instance file. `--port N` held by a non-mdserver listener exits non-zero. The attach client talks to an `httptest` server (the client logic is factored out of `main` so it can be tested).
 - Manual:
   1. `go run . --dir /tmp/a`. Note the port (e.g. 8080) and check that `ls -l ~/Library/Application\ Support/mdserver/instances/` (Linux: `~/.config/mdserver/instances/`) shows `localhost_8080.json` with `-rw-------`.
   2. In a second terminal, `go run . --dir /tmp/b`. It prints `Added /tmp/b to http://localhost:8080/b/`, exits 0, and the browser opens there.
@@ -81,7 +81,22 @@ Decisions:
   accepts any version. If `/_mdserver/info` is missing (a pre-v3 server), the client
   errors and suggests `--new`.
 - `Server.AddRoot` and `LiveReload.AddRoot` from the dependency are the only
-  server-side mutation paths.
+  server-side mutation paths. `Server.AddRoot` returns `(name string, existed bool)`.
+- **Write ordering:** bind the listener (`net.Listen` + `http.Serve`) before writing
+  the instance file, so the file never names a port the server failed to get.
+- **Shutdown cleanup:** `/settings/shutdown` currently calls `os.Exit(0)` directly.
+  It must run the same cleanup as `Stop()` (removing the instance file) before exiting.
+- **Discovery details:** match `--host` exactly (`localhost` and `127.0.0.1` are
+  different). A file whose port answers but isn't mdserver counts as stale. The HTTP
+  client times out after 2s. With several `--dir` values, stop at the first failed
+  attach; roots already attached stay attached.
+- **Ignored-flags warning** fires only for flags set explicitly (`flag.Visit`),
+  because `--live-reload` defaults to true.
+- **Printed path** in `Added <dir>` is the `filepath.Abs` path, not the
+  symlink-resolved one.
+- **Windows:** PID checks are split with build tags. The 0600 mode is a no-op there,
+  and `%AppData%` being per-user is the protection. The mode test is skipped on
+  Windows.
 
 ## Steps
 

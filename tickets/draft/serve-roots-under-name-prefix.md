@@ -38,7 +38,7 @@ Out of scope:
 - [ ] The `..` entry at a root's top level links to `/`.
 - [ ] Root-relative links and images in rendered Markdown (`[x](/sub/b.md)`, `![](/img/a.png)`) resolve inside the page's own root: the rendered `href`/`src` is `/<name>/sub/b.md`. Relative links, absolute URLs (`https://…`), protocol-relative links (`//…`) and fragments (`#x`) are unchanged.
 - [ ] A request whose first path segment matches no root and no reserved route redirects (302) to `/<first-root>/<same path>` if that file or directory exists in the first root. Otherwise it returns 404. This keeps pre-v3 bookmarks working.
-- [ ] Path traversal out of a root is still rejected (403 or 404), including `/<name>/../other-root/x.md` after URL cleaning, and access to a sibling root through `..`.
+- [ ] Path traversal out of a root never returns 200 on the raw request (without following redirects). 301 from the mux's path cleaning, 403 and 404 are all acceptable. A filesystem directory that isn't mounted as a root can't be reached by any URL (404).
 - [ ] Live reload watches every root. A save in any root reloads open tabs.
 - [ ] The settings page groups watched directories under their root (displayed as `<name>/<rel>`). Each root's top-level watch can't be removed, as today.
 - [ ] `server.Config` takes `Roots []Root` (`Name`, `Dir`) instead of `RootDir`. Existing tests are updated to the new URLs and pass.
@@ -49,7 +49,7 @@ Out of scope:
 - `go test ./...` and `go build .` pass (same as CI).
 - New tests in `server/` cover: prefix routing, the `/` roots page, name collision and reserved names, duplicate dirs, redirect fallback, traversal between roots, root-relative link rewriting, and breadcrumbs for a nested file.
 - Manual:
-  1. `mkdir -p /tmp/a/sub /tmp/b && echo '# A\n[b](/sub/b.md) ![i](/i.png)' > /tmp/a/x.md && echo '# B' > /tmp/a/sub/b.md && echo '# other' > /tmp/b/x.md`
+  1. `mkdir -p /tmp/a/sub /tmp/b && printf '# A\n\n[b](/sub/b.md) ![i](/i.png)\n' > /tmp/a/x.md && echo '# B' > /tmp/a/sub/b.md && echo '# other' > /tmp/b/x.md`
   2. `go run . --dir /tmp/a --dir /tmp/b --port 8099`. The browser opens `http://localhost:8099/a/`.
   3. `http://localhost:8099/` lists `a/` and `b/`.
   4. `/a/x.md`: the `b` link goes to `/a/sub/b.md` and the image src is `/a/i.png`.
@@ -92,13 +92,23 @@ Decisions:
   `(*Server).resolve(urlPath) (root *Root, rel string, ok bool)` helper so
   `isValidPath`, `relPath`, breadcrumbs and listings all take the root explicitly
   instead of reading `s.config.RootDir`.
+- **Cross-root links:** a root-relative link always resolves inside the page's own
+  root. `/b/x.md` written in root `a` becomes `/a/b/x.md`. To link to another root,
+  use a full URL.
+- **Naming inputs:** `Root.Dir` stores the `filepath.Abs` path, and the name comes
+  from its basename. `EvalSymlinks` is only the dedup key. A non-empty `Root.Name`
+  in `Config` is used as the base name and still deduplicated. The CLI never sets one.
+  Names that need escaping are `url.PathEscape`d in every URL.
+- **Nested roots** (`--dir ~/n --dir ~/n/sub`) are allowed and mounted separately.
+- **`/<name>` → `/<name>/`** uses 301, like today's directory redirects. Reserved
+  first segments never take the legacy redirect.
 - **Roots slice** is guarded by a `sync.RWMutex` on `Server`, ready for runtime adds
   in the follow-up.
 
 ## Steps
 
 1. `server`: add `Root`, `Config.Roots`, the naming/dedup helper (`AddRoot` on
-   `Server` returning the assigned name) and the mutex. Remove `RootDir`.
+   `Server` returning `(name string, existed bool)`) and the mutex. Remove `RootDir`.
 2. `server`: route `/<name>/…` through `resolve`, add the `/` roots page (reuse
    `directory.html` with root entries), add the legacy 302 fallback, and make
    `isValidPath`/`relPath` per root.
