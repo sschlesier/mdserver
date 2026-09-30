@@ -61,11 +61,7 @@ func NewServer(config Config) *Server {
 		if err != nil {
 			log.Printf("Failed to initialize LiveReload: %v", err)
 		} else {
-			s.liveReload.onRootRemoved = func() {
-				if !s.rootExists() {
-					s.shutdownRootMissing()
-				}
-			}
+			s.liveReload.onRootRemoved = s.shutdownRootMissing
 			if err := s.liveReload.Start(); err != nil {
 				log.Printf("Failed to start LiveReload: %v", err)
 				s.liveReload = nil
