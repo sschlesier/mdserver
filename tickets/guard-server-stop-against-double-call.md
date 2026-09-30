@@ -53,3 +53,10 @@ few milliseconds.
 - 2026-09-30: Deviation: the spec was copied into the repo after implementation, at review
   time, not as the branch's first commit (Start step 3 was skipped).
 - 2026-09-30: Review started.
+- 2026-09-30: Pass 1 round 1: pass. Finding fixed: dropping `s.liveReload.Stop()` survived
+  mutation; added an assertion that live reload is stopped.
+- 2026-09-30: Dismissed: data race at server/livereload.go:197 (`len(lr.clients)` read
+  outside `clientsMu`) fails `go test -race ./server` in TestLiveReloadIntegration. It
+  predates this PR, which doesn't touch livereload.go; it needs its own ticket.
+- 2026-09-30: Dismissed: Stop tests live in rootmissing_test.go rather than their own file.
+  Cosmetic; that file already holds the shutdown-path tests.
