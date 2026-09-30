@@ -246,6 +246,15 @@ func TestRootMissingShutdownWithoutStuckRequestLogsNoTimeout(t *testing.T) {
 	}
 }
 
+func assertLiveReloadStopped(t *testing.T, srv *Server) {
+	t.Helper()
+	select {
+	case <-srv.liveReload.stopChan:
+	default:
+		t.Error("Expected live reload to be stopped")
+	}
+}
+
 func TestStopTwiceSequentially(t *testing.T) {
 	srv := NewServer(Config{Host: "localhost", RootDir: t.TempDir(), EnableLiveReload: true})
 	if srv.liveReload == nil {
@@ -253,6 +262,7 @@ func TestStopTwiceSequentially(t *testing.T) {
 	}
 
 	srv.Stop()
+	assertLiveReloadStopped(t, srv)
 	srv.Stop()
 }
 
@@ -271,4 +281,5 @@ func TestStopConcurrently(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+	assertLiveReloadStopped(t, srv)
 }
