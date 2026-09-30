@@ -100,3 +100,34 @@ func TestRootPresentKeepsServing(t *testing.T) {
 	default:
 	}
 }
+
+func TestRootRenamedShutsDownViaWatcher(t *testing.T) {
+	tmpDir, _, done := startRootTestServer(t, true)
+
+	moved := tmpDir + ".old"
+	t.Cleanup(func() { os.RemoveAll(moved) })
+	if err := os.Rename(tmpDir, moved); err != nil {
+		t.Fatalf("Failed to rename root: %v", err)
+	}
+
+	if err := waitForStart(t, done); !errors.Is(err, ErrRootMissing) {
+		t.Errorf("Expected ErrRootMissing, got %v", err)
+	}
+}
+
+func TestRootRenamedAndReplacedShutsDown(t *testing.T) {
+	tmpDir, _, done := startRootTestServer(t, true)
+
+	moved := tmpDir + ".old"
+	t.Cleanup(func() { os.RemoveAll(moved) })
+	if err := os.Rename(tmpDir, moved); err != nil {
+		t.Fatalf("Failed to rename root: %v", err)
+	}
+	if err := os.Mkdir(tmpDir, 0o755); err != nil {
+		t.Fatalf("Failed to recreate root: %v", err)
+	}
+
+	if err := waitForStart(t, done); !errors.Is(err, ErrRootMissing) {
+		t.Errorf("Expected ErrRootMissing, got %v", err)
+	}
+}
