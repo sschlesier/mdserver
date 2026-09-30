@@ -19,6 +19,10 @@ import (
 // because the root directory no longer exists.
 var ErrRootMissing = errors.New("root directory no longer exists")
 
+// rootMissingShutdownTimeout is how long a missing-root shutdown waits for
+// in-flight requests before closing their connections.
+var rootMissingShutdownTimeout = 2 * time.Second
+
 // Config holds server configuration
 type Config struct {
 	Host             string
@@ -121,15 +125,19 @@ func (s *Server) requireRoot(next http.Handler) http.Handler {
 }
 
 // shutdownRootMissing gracefully stops the HTTP server, letting in-flight
-// responses (including the shutdown notice) finish.
+// responses (including the shutdown notice) finish. Requests still running
+// after rootMissingShutdownTimeout are cut off.
 func (s *Server) shutdownRootMissing() {
 	s.rootGoneOnce.Do(func() {
 		close(s.rootGone)
 		go func() {
 			defer close(s.shutdownDone)
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), rootMissingShutdownTimeout)
 			defer cancel()
-			s.httpServer.Shutdown(ctx)
+			if err := s.httpServer.Shutdown(ctx); errors.Is(err, context.DeadlineExceeded) {
+				log.Printf("Shutdown timed out after %s; closing remaining connections", rootMissingShutdownTimeout)
+				s.httpServer.Close()
+			}
 		}()
 	})
 }
