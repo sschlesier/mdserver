@@ -199,8 +199,8 @@ func (lr *LiveReload) broadcastMessages() {
 	for {
 		select {
 		case message := <-lr.broadcast:
-			lr.verbosef("LiveReload: broadcasting %q to %d clients", string(message), len(lr.clients))
 			lr.clientsMu.RLock()
+			lr.verbosef("LiveReload: broadcasting %q to %d clients", string(message), len(lr.clients))
 			for client := range lr.clients {
 				client.SetWriteDeadline(time.Now().Add(liveReloadWriteTimeout))
 				err := client.WriteMessage(websocket.TextMessage, message)
