@@ -245,3 +245,41 @@ func TestRootMissingShutdownWithoutStuckRequestLogsNoTimeout(t *testing.T) {
 		t.Errorf("Unexpected timeout log line:\n%s", logs.String())
 	}
 }
+
+func assertLiveReloadStopped(t *testing.T, srv *Server) {
+	t.Helper()
+	select {
+	case <-srv.liveReload.stopChan:
+	default:
+		t.Error("Expected live reload to be stopped")
+	}
+}
+
+func TestStopTwiceSequentially(t *testing.T) {
+	srv := NewServer(Config{Host: "localhost", RootDir: t.TempDir(), EnableLiveReload: true})
+	if srv.liveReload == nil {
+		t.Fatal("Expected live reload to be enabled")
+	}
+
+	srv.Stop()
+	assertLiveReloadStopped(t, srv)
+	srv.Stop()
+}
+
+func TestStopConcurrently(t *testing.T) {
+	srv := NewServer(Config{Host: "localhost", RootDir: t.TempDir(), EnableLiveReload: true})
+	if srv.liveReload == nil {
+		t.Fatal("Expected live reload to be enabled")
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			srv.Stop()
+		}()
+	}
+	wg.Wait()
+	assertLiveReloadStopped(t, srv)
+}

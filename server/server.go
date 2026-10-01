@@ -43,6 +43,8 @@ type Server struct {
 	rootGone     chan struct{}
 	rootGoneOnce sync.Once
 	shutdownDone chan struct{}
+
+	stopOnce sync.Once
 }
 
 // NewServer creates a new server instance
@@ -91,11 +93,15 @@ func (s *Server) Start() error {
 	}
 }
 
-// Stop stops the server and cleans up resources
+// Stop stops the server and cleans up resources. It is safe to call more
+// than once, including concurrently: main calls it both on a missing root
+// and on SIGINT/SIGTERM.
 func (s *Server) Stop() {
-	if s.liveReload != nil {
-		s.liveReload.Stop()
-	}
+	s.stopOnce.Do(func() {
+		if s.liveReload != nil {
+			s.liveReload.Stop()
+		}
+	})
 }
 
 // rootExists reports whether the root directory is still present. Errors

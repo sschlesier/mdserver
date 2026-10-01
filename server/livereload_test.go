@@ -449,3 +449,108 @@ func TestLiveReloadAtomicSaveRename(t *testing.T) {
 		t.Errorf("Updated content not found in response. Got: %s", string(body2))
 	}
 }
+
+func TestLiveReloadClientSurvivesBroadcastsAfterWriteTimeout(t *testing.T) {
+	port, err := findAvailablePort()
+	if err != nil {
+		t.Fatalf("Failed to find available port: %v", err)
+	}
+	prev := liveReloadWriteTimeout
+	liveReloadWriteTimeout = 100 * time.Millisecond
+	srv := NewServer(Config{Host: "localhost", Port: port, RootDir: t.TempDir(), EnableLiveReload: true})
+	liveReloadWriteTimeout = prev
+	t.Cleanup(func() {
+		srv.Stop()
+		srv.httpServer.Close()
+	})
+	go srv.Start()
+	time.Sleep(100 * time.Millisecond)
+
+	conn, _, err := websocket.DefaultDialer.Dial("ws://localhost:"+strconv.Itoa(port)+"/livereload", nil)
+	if err != nil {
+		t.Fatalf("Failed to connect WebSocket: %v", err)
+	}
+	t.Cleanup(func() { conn.Close() })
+	time.Sleep(50 * time.Millisecond)
+
+	for i := 0; i < 2; i++ {
+		if i > 0 {
+			time.Sleep(3 * srv.liveReload.writeTimeout)
+		}
+		srv.liveReload.broadcast <- []byte("reload")
+		conn.SetReadDeadline(time.Now().Add(time.Second))
+		if _, msg, err := conn.ReadMessage(); err != nil || string(msg) != "reload" {
+			t.Fatalf("Broadcast %d: expected reload, got %q, err %v", i+1, msg, err)
+		}
+	}
+}
+
+// startStuckLiveReloadClient starts a server with the given write timeout and
+// connects a client that never reads, then floods it until a write blocks.
+func startStuckLiveReloadClient(t *testing.T, writeTimeout time.Duration) *Server {
+	t.Helper()
+	port, err := findAvailablePort()
+	if err != nil {
+		t.Fatalf("Failed to find available port: %v", err)
+	}
+	prev := liveReloadWriteTimeout
+	liveReloadWriteTimeout = writeTimeout
+	srv := NewServer(Config{Host: "localhost", Port: port, RootDir: t.TempDir(), EnableLiveReload: true})
+	liveReloadWriteTimeout = prev
+	t.Cleanup(func() {
+		srv.Stop()
+		srv.httpServer.Close()
+	})
+	go srv.Start()
+	time.Sleep(100 * time.Millisecond)
+
+	conn, _, err := websocket.DefaultDialer.Dial("ws://localhost:"+strconv.Itoa(port)+"/livereload", nil)
+	if err != nil {
+		t.Fatalf("Failed to connect WebSocket: %v", err)
+	}
+	t.Cleanup(func() { conn.Close() })
+	time.Sleep(50 * time.Millisecond)
+
+	payload := make([]byte, 1<<20)
+	for i := 0; i < 64; i++ {
+		srv.liveReload.broadcast <- payload
+	}
+	time.Sleep(50 * time.Millisecond)
+	return srv
+}
+
+func liveReloadClientCount(srv *Server) int {
+	srv.liveReload.clientsMu.RLock()
+	defer srv.liveReload.clientsMu.RUnlock()
+	return len(srv.liveReload.clients)
+}
+
+func TestStuckLiveReloadClientIsDropped(t *testing.T) {
+	srv := startStuckLiveReloadClient(t, 200*time.Millisecond)
+
+	deadline := time.Now().Add(2 * time.Second)
+	for liveReloadClientCount(srv) != 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("Client whose write timed out is still registered")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+func TestStopWithStuckLiveReloadClient(t *testing.T) {
+	srv := startStuckLiveReloadClient(t, 500*time.Millisecond)
+	if liveReloadClientCount(srv) != 1 {
+		t.Fatal("Expected the stuck client to still be registered when Stop is called")
+	}
+
+	stopped := make(chan struct{})
+	go func() {
+		srv.Stop()
+		close(stopped)
+	}()
+	select {
+	case <-stopped:
+	case <-time.After(srv.liveReload.writeTimeout + time.Second):
+		t.Fatal("Stop blocked behind a live-reload client that stopped reading")
+	}
+}
