@@ -127,3 +127,12 @@ Don't touch: the test, build and release jobs; the `on:` trigger.
   doing the key setup via gh. Push the hand-update with the new deploy key to prove it writes.
 - 2026-09-30: Approved: Scott Schlesier, 2026-09-30: approved with hand-update to v2.1.0 and Claude-run key setup. Cold read: pass
 - 2026-09-30: Started on branch push-homebrew-tap-with-deploy-key
+- 2026-09-30: Deploy key `homebrew-mdserver-deploy` added to the tap (read_only=false).
+- 2026-09-30: The worktree-isolated session refuses git aimed at another repo, so the user
+  ran the v2.1.0 tap update themselves, from their existing checkout
+  `~/src/homebrew-mdserver` instead of a scratchpad clone (pull --ff-only first; push with
+  only the deploy key via GIT_SSH_COMMAND). Tap commit c219e81 `Update mdserver to v2.1.0`;
+  all four sha256 values match the v2.1.0 `checksums.txt`.
+- 2026-09-30: `HOMEBREW_DEPLOY_KEY` secret set; scratchpad key files deleted (`ls` empty).
+- 2026-09-30: Assumption: the HOMEBREW_PUSH_TOKEN grep excludes `tickets/`, since this spec
+  names it. PyYAML isn't installed; the YAML check used `ruby -ryaml` instead.
