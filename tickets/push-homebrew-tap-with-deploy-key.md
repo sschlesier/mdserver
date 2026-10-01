@@ -137,3 +137,9 @@ Don't touch: the test, build and release jobs; the `on:` trigger.
 - 2026-09-30: Assumption: the HOMEBREW_PUSH_TOKEN grep excludes `tickets/`, since this spec
   names it. PyYAML isn't installed; the YAML check used `ruby -ryaml` instead.
 - 2026-09-30: Review started
+- 2026-09-30: Round 1 pass 1: fail only on unverifiable parts of criteria 3 and 4.
+  Dismissed: surviving mutants M3 (`ssh-key:` moved to the main-repo checkout) and M4
+  (`persist-credentials: false`) at release.yml:198-202 — the Design says the workflow
+  wiring is proven end to end by the next release, and a lint pinning its shape is out of
+  scope. Dismissed: M7 (`git add -A`) at release.yml:234 — the line predates this PR and
+  isn't in the diff.
