@@ -485,13 +485,16 @@ func TestLiveReloadClientSurvivesBroadcastsAfterWriteTimeout(t *testing.T) {
 	}
 }
 
-func TestStopWithStuckLiveReloadClient(t *testing.T) {
+// startStuckLiveReloadClient starts a server with the given write timeout and
+// connects a client that never reads, then floods it until a write blocks.
+func startStuckLiveReloadClient(t *testing.T, writeTimeout time.Duration) *Server {
+	t.Helper()
 	port, err := findAvailablePort()
 	if err != nil {
 		t.Fatalf("Failed to find available port: %v", err)
 	}
 	prev := liveReloadWriteTimeout
-	liveReloadWriteTimeout = 200 * time.Millisecond
+	liveReloadWriteTimeout = writeTimeout
 	srv := NewServer(Config{Host: "localhost", Port: port, RootDir: t.TempDir(), EnableLiveReload: true})
 	liveReloadWriteTimeout = prev
 	t.Cleanup(func() {
@@ -501,7 +504,6 @@ func TestStopWithStuckLiveReloadClient(t *testing.T) {
 	go srv.Start()
 	time.Sleep(100 * time.Millisecond)
 
-	// A client that never reads: once its socket buffers fill, writes to it block.
 	conn, _, err := websocket.DefaultDialer.Dial("ws://localhost:"+strconv.Itoa(port)+"/livereload", nil)
 	if err != nil {
 		t.Fatalf("Failed to connect WebSocket: %v", err)
@@ -513,7 +515,33 @@ func TestStopWithStuckLiveReloadClient(t *testing.T) {
 	for i := 0; i < 64; i++ {
 		srv.liveReload.broadcast <- payload
 	}
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
+	return srv
+}
+
+func liveReloadClientCount(srv *Server) int {
+	srv.liveReload.clientsMu.RLock()
+	defer srv.liveReload.clientsMu.RUnlock()
+	return len(srv.liveReload.clients)
+}
+
+func TestStuckLiveReloadClientIsDropped(t *testing.T) {
+	srv := startStuckLiveReloadClient(t, 200*time.Millisecond)
+
+	deadline := time.Now().Add(2 * time.Second)
+	for liveReloadClientCount(srv) != 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("Client whose write timed out is still registered")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+func TestStopWithStuckLiveReloadClient(t *testing.T) {
+	srv := startStuckLiveReloadClient(t, 500*time.Millisecond)
+	if liveReloadClientCount(srv) != 1 {
+		t.Fatal("Expected the stuck client to still be registered when Stop is called")
+	}
 
 	stopped := make(chan struct{})
 	go func() {
