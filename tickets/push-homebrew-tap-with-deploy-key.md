@@ -143,3 +143,13 @@ Don't touch: the test, build and release jobs; the `on:` trigger.
   wiring is proven end to end by the next release, and a lint pinning its shape is out of
   scope. Dismissed: M7 (`git add -A`) at release.yml:234 — the line predates this PR and
   isn't in the diff.
+- 2026-09-30: Correction to the tap-update entry above: ~/.ssh/config sets `ControlMaster
+  auto` / `ControlPersist 300`, and the script pulled with the user's key seconds before
+  pushing, so the push most likely reused that connection and never presented the deploy
+  key (`last_used` still null). Criterion 3's "pushed with that deploy key" and the Design's
+  write proof are not shown. The tap checkout's remote is SSH
+  (`git@github.com:sschlesier/homebrew-mdserver.git`), and the script did set
+  `GIT_SSH_COMMAND="ssh -i <key> -o IdentitiesOnly=yes"`. The config also sets
+  `AddKeysToAgent yes`.
+- 2026-09-30: Round 2 pass 1: same result, plus the multiplexing finding above. Pass 2:
+  both risks FOR PERSON (the push-with-deploy-key one RAISED).
