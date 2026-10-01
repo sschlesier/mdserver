@@ -40,8 +40,7 @@ Out of scope:
 - [ ] sschlesier/homebrew-mdserver has one deploy key titled `homebrew-mdserver-deploy` with
       write access (`read_only=false`).
 - [ ] The tap's `Formula/mdserver.rb` on main reports `version "2.1.0"` with the v2.1.0
-      release's checksums, in a commit `Update mdserver to v2.1.0` pushed over SSH with that
-      deploy key.
+      release's checksums, in a commit `Update mdserver to v2.1.0`.
 - [ ] sschlesier/mdserver has an Actions secret `HOMEBREW_DEPLOY_KEY` holding that key's
       private half; the key files generated in the scratchpad are deleted (`ls` on their
       paths fails).
@@ -153,3 +152,8 @@ Don't touch: the test, build and release jobs; the `on:` trigger.
   `AddKeysToAgent yes`.
 - 2026-09-30: Round 2 pass 1: same result, plus the multiplexing finding above. Pass 2:
   both risks FOR PERSON (the push-with-deploy-key one RAISED).
+- 2026-09-30: Criterion 3 changed with Scott Schlesier's yes in review: dropped "pushed over
+  SSH with that deploy key". Risks accepted by Scott Schlesier: (1) the deploy key has never
+  been shown to authenticate against the tap, and (2) the secret's contents can't be
+  checked. The next release proves both; if its tap job fails, re-set the secret and
+  re-run that job.
