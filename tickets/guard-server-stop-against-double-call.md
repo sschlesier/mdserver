@@ -4,7 +4,7 @@ type: bug
 priority: 3
 depends-on: [root-missing-shutdown-timeout]
 approved: "Scott Schlesier, 2026-09-30: approved after review of PR #3 findings. Cold read: not run"
-status: in-review
+status: done
 ---
 
 Pressing Ctrl-C while mdserver is shutting down because its folder disappeared exits cleanly instead of panicking.
@@ -24,11 +24,11 @@ few milliseconds.
 
 ## Acceptance criteria
 
-- [ ] Calling `Server.Stop()` twice, sequentially or concurrently, doesn't panic.
-- [ ] A test calls `Stop()` concurrently from two goroutines with live reload on, and passes
+- [x] Calling `Server.Stop()` twice, sequentially or concurrently, doesn't panic.
+- [x] A test calls `Stop()` concurrently from two goroutines with live reload on, and passes
       under `-race`.
-- [ ] Exit codes don't change: 0 on a missing root, 0 on SIGINT/SIGTERM.
-- [ ] (Added in review round 1.) A live-reload client that stops reading can't block `Stop`:
+- [x] Exit codes don't change: 0 on a missing root, 0 on SIGINT/SIGTERM.
+- [x] (Added in review round 1.) A live-reload client that stops reading can't block `Stop`:
       with such a client connected, `Stop` returns within the write deadline plus 1s.
 
 ## Verification
@@ -102,3 +102,9 @@ few milliseconds.
   and closes every client.
 - 2026-09-30: Pass 2: risk "several slow-but-not-stuck clients make Stop wait about N×2s"
   is FOR PERSON. No broken "Valid while" conditions.
+- 2026-09-30: Risk accepted (Scott Schlesier): several slow-but-not-stuck tabs can delay
+  Stop by about 2s each. Not added to the review profile.
+- 2026-09-30: Accepted: Scott Schlesier, 2026-09-30, round 2
+- 2026-09-30: Done: Server.Stop is guarded by sync.Once, so a second Stop is a no-op. Live
+  reload writes have a 2s deadline, so a stuck tab can't hang shutdown. The clients-count
+  data race is fixed, and CI runs tests with -race.
