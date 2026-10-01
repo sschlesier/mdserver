@@ -90,3 +90,6 @@ few milliseconds.
   var at creation, so there's no race) and shuts its HTTP server down.
 - 2026-09-30: Scope change approved (Scott Schlesier): CI runs tests with `-race`, replacing
   the earlier dismissal now that the race is fixed.
+- 2026-09-30: Pass 1 rerun after triage: pass. Mutant survived: deadline set after the
+  write (a stale deadline drops a healthy tab on its next reload). Added
+  TestLiveReloadClientSurvivesBroadcastsAfterWriteTimeout, which kills it.
