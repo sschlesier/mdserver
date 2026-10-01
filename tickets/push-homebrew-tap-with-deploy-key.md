@@ -57,9 +57,9 @@ After merge:
 ## Verification
 
 - `go test ./...` and `go build .` pass (no Go changes expected; confirms nothing else moved).
-- `actionlint .github/workflows/release.yml` if installed (it isn't today); otherwise
-  `python3 -c 'import yaml,sys; yaml.safe_load(open(".github/workflows/release.yml"))'`.
-- `grep -rn HOMEBREW_PUSH_TOKEN --exclude-dir=.git .` → no matches.
+- `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/release.yml`
+  → no findings on the changed lines.
+- `grep -rn HOMEBREW_PUSH_TOKEN --exclude-dir=.git --exclude-dir=tickets .` → no matches.
 - `git diff main -- .github/workflows/release.yml` → only the update-homebrew job changes;
   `on:` is untouched.
 - `gh api repos/sschlesier/homebrew-mdserver/keys -q '.[] | "\(.title) \(.read_only)"'`
