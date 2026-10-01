@@ -450,6 +450,41 @@ func TestLiveReloadAtomicSaveRename(t *testing.T) {
 	}
 }
 
+func TestLiveReloadClientSurvivesBroadcastsAfterWriteTimeout(t *testing.T) {
+	port, err := findAvailablePort()
+	if err != nil {
+		t.Fatalf("Failed to find available port: %v", err)
+	}
+	prev := liveReloadWriteTimeout
+	liveReloadWriteTimeout = 100 * time.Millisecond
+	srv := NewServer(Config{Host: "localhost", Port: port, RootDir: t.TempDir(), EnableLiveReload: true})
+	liveReloadWriteTimeout = prev
+	t.Cleanup(func() {
+		srv.Stop()
+		srv.httpServer.Close()
+	})
+	go srv.Start()
+	time.Sleep(100 * time.Millisecond)
+
+	conn, _, err := websocket.DefaultDialer.Dial("ws://localhost:"+strconv.Itoa(port)+"/livereload", nil)
+	if err != nil {
+		t.Fatalf("Failed to connect WebSocket: %v", err)
+	}
+	t.Cleanup(func() { conn.Close() })
+	time.Sleep(50 * time.Millisecond)
+
+	for i := 0; i < 2; i++ {
+		if i > 0 {
+			time.Sleep(3 * srv.liveReload.writeTimeout)
+		}
+		srv.liveReload.broadcast <- []byte("reload")
+		conn.SetReadDeadline(time.Now().Add(time.Second))
+		if _, msg, err := conn.ReadMessage(); err != nil || string(msg) != "reload" {
+			t.Fatalf("Broadcast %d: expected reload, got %q, err %v", i+1, msg, err)
+		}
+	}
+}
+
 func TestStopWithStuckLiveReloadClient(t *testing.T) {
 	port, err := findAvailablePort()
 	if err != nil {
