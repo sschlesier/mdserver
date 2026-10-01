@@ -93,3 +93,12 @@ few milliseconds.
 - 2026-09-30: Pass 1 rerun after triage: pass. Mutant survived: deadline set after the
   write (a stale deadline drops a healthy tab on its next reload). Added
   TestLiveReloadClientSurvivesBroadcastsAfterWriteTimeout, which kills it.
+- 2026-09-30: Final pass 1 rerun: pass. Findings fixed (not cold-verified; rerun budget
+  used): the stuck-client test called Stop after the client was already dropped, so it was
+  split into Stop-while-blocked and client-is-dropped tests. Checked by hand: removing
+  SetWriteDeadline fails both; removing the delete/Close path fails the drop test.
+- 2026-09-30: Dismissed: code review's "Stop waits 2s per stuck tab". Measured about 455ms
+  for 3 stuck clients at a 500ms deadline: Stop takes the lock after the first failed write
+  and closes every client.
+- 2026-09-30: Pass 2: risk "several slow-but-not-stuck clients make Stop wait about N×2s"
+  is FOR PERSON. No broken "Valid while" conditions.
