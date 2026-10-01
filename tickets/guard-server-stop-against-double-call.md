@@ -28,6 +28,8 @@ few milliseconds.
 - [ ] A test calls `Stop()` concurrently from two goroutines with live reload on, and passes
       under `-race`.
 - [ ] Exit codes don't change: 0 on a missing root, 0 on SIGINT/SIGTERM.
+- [ ] (Added in review round 1.) A live-reload client that stops reading can't block `Stop`:
+      with such a client connected, `Stop` returns within the write deadline plus 1s.
 
 ## Verification
 
@@ -38,6 +40,10 @@ few milliseconds.
 
 - Guard `Server.Stop` with a `sync.Once` field on `Server`: the first call stops live reload,
   and later calls do nothing. `LiveReload.Stop` and `main` are unchanged.
+- (Added in review round 1.) Each live-reload WebSocket write gets a 2s write deadline
+  (matching `rootMissingShutdownTimeout`), so a client that stops reading fails its write,
+  is dropped by the existing error path, and releases `clientsMu`. The deadline is a
+  package-level var so a test can lower it.
 - Order: after `root-missing-shutdown-timeout`, which also changes the shutdown path, so this
   one is written against its final shape.
 
@@ -69,3 +75,7 @@ few milliseconds.
   behind it instead of panicking out. Sent to pass 2.
 - 2026-09-30: Pass 2: the stuck-Stop risk is FOR PERSON (nothing in the spec or profile
   settles it). No broken "Valid while" conditions.
+- 2026-09-30: Needs fixes (round 1): 1. A stuck live-reload client must not block `Stop`;
+  Ctrl-C would otherwise wait behind it until SIGKILL.
+- 2026-09-30: Spec change approved (Scott Schlesier): added criterion 4 and a Design bullet
+  for a 2s per-write WebSocket deadline in livereload.go.
