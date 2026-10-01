@@ -4,7 +4,7 @@ type: chore
 priority: 1
 depends-on: []
 approved: "Scott Schlesier, 2026-09-30: approved with hand-update to v2.1.0 and Claude-run key setup. Cold read: pass"
-status: in-progress
+status: in-review
 ---
 
 A tagged mdserver release updates the Homebrew tap again, authenticated by a deploy key on
@@ -136,3 +136,4 @@ Don't touch: the test, build and release jobs; the `on:` trigger.
 - 2026-09-30: `HOMEBREW_DEPLOY_KEY` secret set; scratchpad key files deleted (`ls` empty).
 - 2026-09-30: Assumption: the HOMEBREW_PUSH_TOKEN grep excludes `tickets/`, since this spec
   names it. PyYAML isn't installed; the YAML check used `ruby -ryaml` instead.
+- 2026-09-30: Review started
