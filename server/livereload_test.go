@@ -455,7 +455,14 @@ func TestStopWithStuckLiveReloadClient(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to find available port: %v", err)
 	}
+	prev := liveReloadWriteTimeout
+	liveReloadWriteTimeout = 200 * time.Millisecond
 	srv := NewServer(Config{Host: "localhost", Port: port, RootDir: t.TempDir(), EnableLiveReload: true})
+	liveReloadWriteTimeout = prev
+	t.Cleanup(func() {
+		srv.Stop()
+		srv.httpServer.Close()
+	})
 	go srv.Start()
 	time.Sleep(100 * time.Millisecond)
 
@@ -480,7 +487,7 @@ func TestStopWithStuckLiveReloadClient(t *testing.T) {
 	}()
 	select {
 	case <-stopped:
-	case <-time.After(3 * time.Second):
+	case <-time.After(srv.liveReload.writeTimeout + time.Second):
 		t.Fatal("Stop blocked behind a live-reload client that stopped reading")
 	}
 }

@@ -45,6 +45,8 @@ type LiveReload struct {
 	broadcast chan []byte
 	stopChan  chan struct{}
 
+	writeTimeout time.Duration
+
 	// onRootRemoved, if set, is called when the root directory itself is
 	// removed or renamed.
 	onRootRemoved func()
@@ -65,6 +67,8 @@ func NewLiveReload(rootDir string, verbose bool) (*LiveReload, error) {
 		watched:   make(map[string]bool),
 		broadcast: make(chan []byte, 256),
 		stopChan:  make(chan struct{}),
+
+		writeTimeout: liveReloadWriteTimeout,
 	}
 
 	return lr, nil
@@ -202,7 +206,7 @@ func (lr *LiveReload) broadcastMessages() {
 			lr.clientsMu.RLock()
 			lr.verbosef("LiveReload: broadcasting %q to %d clients", string(message), len(lr.clients))
 			for client := range lr.clients {
-				client.SetWriteDeadline(time.Now().Add(liveReloadWriteTimeout))
+				client.SetWriteDeadline(time.Now().Add(lr.writeTimeout))
 				err := client.WriteMessage(websocket.TextMessage, message)
 				if err != nil {
 					log.Printf("LiveReload: Error writing to client: %v", err)
