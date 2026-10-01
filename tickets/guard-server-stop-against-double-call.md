@@ -85,3 +85,8 @@ few milliseconds.
 - 2026-09-30: Scope change approved (Scott Schlesier): the new test exposed the earlier
   dismissed livereload.go race (`len(lr.clients)` outside clientsMu), failing this spec's
   `-race -run Stop` check. Fixed here as review item 1.2. `go test -race ./...` passes.
+- 2026-09-30: Pass 1 after send-back: pass, 4/4 criteria, 8 mutants, none survived.
+- 2026-09-30: Fixed: the stuck-client test lowers the write deadline (LiveReload copies the
+  var at creation, so there's no race) and shuts its HTTP server down.
+- 2026-09-30: Scope change approved (Scott Schlesier): CI runs tests with `-race`, replacing
+  the earlier dismissal now that the race is fixed.
