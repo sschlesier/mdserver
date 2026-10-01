@@ -449,3 +449,38 @@ func TestLiveReloadAtomicSaveRename(t *testing.T) {
 		t.Errorf("Updated content not found in response. Got: %s", string(body2))
 	}
 }
+
+func TestStopWithStuckLiveReloadClient(t *testing.T) {
+	port, err := findAvailablePort()
+	if err != nil {
+		t.Fatalf("Failed to find available port: %v", err)
+	}
+	srv := NewServer(Config{Host: "localhost", Port: port, RootDir: t.TempDir(), EnableLiveReload: true})
+	go srv.Start()
+	time.Sleep(100 * time.Millisecond)
+
+	// A client that never reads: once its socket buffers fill, writes to it block.
+	conn, _, err := websocket.DefaultDialer.Dial("ws://localhost:"+strconv.Itoa(port)+"/livereload", nil)
+	if err != nil {
+		t.Fatalf("Failed to connect WebSocket: %v", err)
+	}
+	t.Cleanup(func() { conn.Close() })
+	time.Sleep(50 * time.Millisecond)
+
+	payload := make([]byte, 1<<20)
+	for i := 0; i < 64; i++ {
+		srv.liveReload.broadcast <- payload
+	}
+	time.Sleep(500 * time.Millisecond)
+
+	stopped := make(chan struct{})
+	go func() {
+		srv.Stop()
+		close(stopped)
+	}()
+	select {
+	case <-stopped:
+	case <-time.After(3 * time.Second):
+		t.Fatal("Stop blocked behind a live-reload client that stopped reading")
+	}
+}

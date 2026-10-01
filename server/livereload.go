@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/gorilla/websocket"
@@ -20,6 +21,10 @@ var upgrader = websocket.Upgrader{
 		return true
 	},
 }
+
+// liveReloadWriteTimeout bounds each write to a live-reload client, so one
+// that stops reading is dropped instead of holding clientsMu and blocking Stop.
+var liveReloadWriteTimeout = 2 * time.Second
 
 // skipDirs are directories that should never be watched (heavy or irrelevant)
 var skipDirs = map[string]bool{
@@ -197,6 +202,7 @@ func (lr *LiveReload) broadcastMessages() {
 			lr.verbosef("LiveReload: broadcasting %q to %d clients", string(message), len(lr.clients))
 			lr.clientsMu.RLock()
 			for client := range lr.clients {
+				client.SetWriteDeadline(time.Now().Add(liveReloadWriteTimeout))
 				err := client.WriteMessage(websocket.TextMessage, message)
 				if err != nil {
 					log.Printf("LiveReload: Error writing to client: %v", err)
