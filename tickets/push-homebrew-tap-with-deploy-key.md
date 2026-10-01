@@ -4,7 +4,7 @@ type: chore
 priority: 1
 depends-on: []
 approved: "Scott Schlesier, 2026-09-30: approved with hand-update to v2.1.0 and Claude-run key setup. Cold read: pass"
-status: in-review
+status: done
 ---
 
 A tagged mdserver release updates the Homebrew tap again, authenticated by a deploy key on
@@ -34,19 +34,19 @@ Out of scope:
 
 ## Acceptance criteria
 
-- [ ] `.github/workflows/release.yml` no longer references `HOMEBREW_PUSH_TOKEN`; the
+- [x] `.github/workflows/release.yml` no longer references `HOMEBREW_PUSH_TOKEN`; the
       homebrew-mdserver checkout uses `ssh-key: ${{ secrets.HOMEBREW_DEPLOY_KEY }}` and the
       push step runs `git push origin main` with no `remote set-url`.
-- [ ] sschlesier/homebrew-mdserver has one deploy key titled `homebrew-mdserver-deploy` with
+- [x] sschlesier/homebrew-mdserver has one deploy key titled `homebrew-mdserver-deploy` with
       write access (`read_only=false`).
-- [ ] The tap's `Formula/mdserver.rb` on main reports `version "2.1.0"` with the v2.1.0
+- [x] The tap's `Formula/mdserver.rb` on main reports `version "2.1.0"` with the v2.1.0
       release's checksums, in a commit `Update mdserver to v2.1.0`.
-- [ ] sschlesier/mdserver has an Actions secret `HOMEBREW_DEPLOY_KEY` holding that key's
+- [x] sschlesier/mdserver has an Actions secret `HOMEBREW_DEPLOY_KEY` holding that key's
       private half; the key files generated in the scratchpad are deleted (`ls` on their
       paths fails).
-- [ ] The release workflow still triggers only on `v*.*.*` tag pushes and still changes only
+- [x] The release workflow still triggers only on `v*.*.*` tag pushes and still changes only
       `Formula/mdserver.rb` in the tap.
-- [ ] CLAUDE.md's review profile names `HOMEBREW_DEPLOY_KEY` (a write deploy key scoped to
+- [x] CLAUDE.md's review profile names `HOMEBREW_DEPLOY_KEY` (a write deploy key scoped to
       sschlesier/homebrew-mdserver) instead of `HOMEBREW_PUSH_TOKEN`.
 
 After merge:
@@ -157,3 +157,9 @@ Don't touch: the test, build and release jobs; the `on:` trigger.
   been shown to authenticate against the tap, and (2) the secret's contents can't be
   checked. The next release proves both; if its tap job fails, re-set the secret and
   re-run that job.
+- 2026-09-30: Accepted: Scott Schlesier, 2026-09-30, round 2
+- 2026-09-30: Done: release.yml checks out and pushes the tap with the `HOMEBREW_DEPLOY_KEY`
+  deploy key instead of the expired PAT; the tap was hand-updated to v2.1.0 (c219e81).
+  Criterion 4's key contents and the key's first real write are accepted risks, proven by
+  the next release. Criterion 7 (delete `HOMEBREW_PUSH_TOKEN`) runs right after merge and is
+  recorded as a comment on PR #8. The user revokes the PAT on github.com.
