@@ -60,3 +60,12 @@ few milliseconds.
   predates this PR, which doesn't touch livereload.go; it needs its own ticket.
 - 2026-09-30: Dismissed: Stop tests live in rootmissing_test.go rather than their own file.
   Cosmetic; that file already holds the shutdown-path tests.
+- 2026-09-30: Pass 1 round 2: pass. 2/2 revert, 8 mutants, none survived.
+- 2026-09-30: Dismissed: CI (.github/workflows/ci.yml:26) runs tests without `-race`, so a
+  racy Stop guard would pass CI. Out of scope here; `-race` can't be added until the
+  livereload.go:197 race is fixed, so it belongs with that ticket.
+- 2026-09-30: Unproven risk from round 2: a stuck live-reload client can block the first
+  Stop (WriteMessage under clientsMu.RLock with no write deadline), and Ctrl-C then waits
+  behind it instead of panicking out. Sent to pass 2.
+- 2026-09-30: Pass 2: the stuck-Stop risk is FOR PERSON (nothing in the spec or profile
+  settles it). No broken "Valid while" conditions.
