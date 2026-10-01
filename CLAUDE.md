@@ -28,7 +28,7 @@ Deploy:    The user's own machine. Binds to localhost on an auto-selected port b
 Load:      One user, a few browser tabs.
 Data:      Reads files under the served root; writes nothing to disk. Nothing sensitive of
            its own, but it serves what's in the root. The release workflow holds
-           HOMEBREW_PUSH_TOKEN, which can write to sschlesier/homebrew-mdserver.
+           HOMEBREW_DEPLOY_KEY, a write deploy key scoped to sschlesier/homebrew-mdserver.
 Staleness: A saved file should show in open tabs within about a second (live reload).
 
 Invariants:
