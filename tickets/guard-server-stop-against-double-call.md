@@ -79,3 +79,9 @@ few milliseconds.
   Ctrl-C would otherwise wait behind it until SIGKILL.
 - 2026-09-30: Spec change approved (Scott Schlesier): added criterion 4 and a Design bullet
   for a 2s per-write WebSocket deadline in livereload.go.
+- 2026-09-30: Fixed 1.1: 2s per-write deadline in broadcastMessages.
+  TestStopWithStuckLiveReloadClient blocked past 3s before the fix; it now returns in
+  about 2.2s total.
+- 2026-09-30: Scope change approved (Scott Schlesier): the new test exposed the earlier
+  dismissed livereload.go race (`len(lr.clients)` outside clientsMu), failing this spec's
+  `-race -run Stop` check. Fixed here as review item 1.2. `go test -race ./...` passes.
