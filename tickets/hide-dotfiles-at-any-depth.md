@@ -4,7 +4,7 @@ id: era-sib
 type: bug
 priority: 1
 approved: "Scott Schlesier, 2026-09-30: approved after review of PR #3 findings. Cold read: pass"
-status: in-progress
+status: in-review
 ---
 
 No URL serves, renders or lists a file or directory under the root whose path has any segment
@@ -67,3 +67,4 @@ Out of scope:
 - 2026-10-03: Implemented. `go test ./...` passes; with the fix reverted the new table test
   fails on all 19 blocked cases. The manual curl repro was not run (the command was denied);
   the httptest table drives the same requests through the real handler.
+- 2026-10-03: Review started (PR #9)
