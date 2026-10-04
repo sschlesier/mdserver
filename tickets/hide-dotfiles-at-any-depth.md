@@ -68,3 +68,10 @@ Out of scope:
   fails on all 19 blocked cases. The manual curl repro was not run (the command was denied);
   the httptest table drives the same requests through the real handler.
 - 2026-10-03: Review started (PR #9)
+- 2026-10-03: Review round 1 triage. Fixed: no test covered the outside-root 403 (mutants M11 and
+  M9 survived); added `TestOutsideRootPathsStayForbidden`, which kills M11. Also added `%2f` and
+  `/.hidden/.` cases (the latter is a mux 307 to `/.hidden/`, which is 404). Dismissed as
+  equivalent mutants: dropping the hidden check in `handleIndex`, `handleStaticFile` or
+  `isValidPath` (every caller is already guarded in `handleRequest`; the copies are defence in
+  depth per Design), skipping `..` in `hasDotSegment` (`filepath.Rel` never yields `..` mid-path),
+  and the `filepath.Abs` error branch (unreachable). `claude -p "/code-review 9"`: no findings.

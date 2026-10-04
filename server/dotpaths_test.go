@@ -58,6 +58,9 @@ func TestDotSegmentsAreNotServed(t *testing.T) {
 		{"/%2ehidden/a.md", http.StatusNotFound},
 		{"/assets/docs/%2eenv", http.StatusNotFound},
 		{"/assets/%2eenv", http.StatusNotFound},
+		{"/.hidden/.", http.StatusTemporaryRedirect}, // mux redirects to /.hidden/, which is 404
+		{"/%2ehidden%2fa.md", http.StatusNotFound},
+		{"/docs%2f%2eenv", http.StatusNotFound},
 		{"/", http.StatusOK},
 		{"/visible.md", http.StatusOK},
 		{"/visible", http.StatusOK},
