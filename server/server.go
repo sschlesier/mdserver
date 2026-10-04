@@ -221,6 +221,11 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	filePath := filepath.Join(s.config.RootDir, requestPath)
 
+	if s.isHiddenPath(filePath) {
+		http.NotFound(w, r)
+		return
+	}
+
 	// Check if path exists and is a directory
 	if info, err := os.Stat(filePath); err == nil && info.IsDir() {
 		// Ensure directory paths end with / for consistency
@@ -270,11 +275,47 @@ func (s *Server) isValidPath(filePath string) bool {
 	}
 
 	// Prevent directory traversal
-	return rel != ".." && rel != "." && len(rel) > 0 && rel[0] != '.'
+	return rel != ".." && rel != "." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !hasDotSegment(rel)
+}
+
+// hasDotSegment reports whether any segment of a root-relative path starts with ".".
+func hasDotSegment(rel string) bool {
+	for _, seg := range strings.Split(filepath.ToSlash(rel), "/") {
+		if seg == "." || seg == ".." {
+			continue
+		}
+		if strings.HasPrefix(seg, ".") {
+			return true
+		}
+	}
+	return false
+}
+
+// isHiddenPath reports whether filePath is inside the root and has a dot segment
+// relative to the root. Paths outside the root are not hidden; isValidPath rejects them.
+func (s *Server) isHiddenPath(filePath string) bool {
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		return false
+	}
+	absRoot, err := filepath.Abs(s.config.RootDir)
+	if err != nil {
+		return false
+	}
+	rel, err := filepath.Rel(absRoot, absPath)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return false
+	}
+	return hasDotSegment(rel)
 }
 
 // handleStaticFile serves a static file from the root directory
 func (s *Server) handleStaticFile(w http.ResponseWriter, r *http.Request, filePath string) {
+	if s.isHiddenPath(filePath) {
+		http.NotFound(w, r)
+		return
+	}
+
 	// Validate path is within root directory
 	if !s.isValidPath(filePath) {
 		http.Error(w, "Invalid path", http.StatusForbidden)

@@ -90,6 +90,10 @@ type DirectoryEntry struct {
 
 // handleIndex generates a directory index page
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, dirPath string) {
+	if s.isHiddenPath(dirPath) {
+		http.NotFound(w, r)
+		return
+	}
 	log.Printf("dir: %s", s.relPath(dirPath))
 	if s.liveReload != nil {
 		s.liveReload.EnsureWatching(dirPath)
@@ -256,6 +260,11 @@ func (s *Server) handleAssets(w http.ResponseWriter, r *http.Request) {
 
 	// Construct full file path
 	filePath := filepath.Join(s.config.RootDir, requestPath)
+
+	if s.isHiddenPath(filePath) {
+		http.NotFound(w, r)
+		return
+	}
 
 	// Validate path is within root directory
 	if !s.isValidPath(filePath) {
