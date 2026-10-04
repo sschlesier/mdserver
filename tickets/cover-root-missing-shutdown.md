@@ -5,7 +5,7 @@ type: chore
 priority: 2
 depends-on: []
 approved: "Scott Schlesier, 2026-09-30: approved after review of PR #3 findings. Cold read: not run"
-status: in-progress
+status: in-review
 ---
 
 The missing-root shutdown from PR #3 has tests for each behavior its spec promised, so a
@@ -65,3 +65,4 @@ Out of scope:
   - synchronous Shutdown: TestMissingRootNoticeIsPromptAndClosesConnection (and four others)
   - Start not waiting for shutdown: TestStartWaitsForInFlightRequestOnRootMissing
 - 2026-10-03: The Go client strips the Connection header and reports it as resp.Close, so that test checks resp.Close.
+- 2026-10-03: Review started
