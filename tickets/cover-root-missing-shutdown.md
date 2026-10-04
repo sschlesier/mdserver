@@ -5,7 +5,7 @@ type: chore
 priority: 2
 depends-on: []
 approved: "Scott Schlesier, 2026-09-30: approved after review of PR #3 findings. Cold read: not run"
-status: in-review
+status: done
 ---
 
 The missing-root shutdown from PR #3 has tests for each behavior its spec promised, so a
@@ -67,3 +67,4 @@ Out of scope:
 - 2026-10-03: The Go client strips the Connection header and reports it as resp.Close, so that test checks resp.Close.
 - 2026-10-03: Review started
 - 2026-10-03: Round 1 triage. Dismissed: dropping the 410 page's Content-Type header survives the suite; no criterion or invariant requires a test for it. Cleared by the spec: chmod 000 depends on os.Stat returning EACCES; the spec prescribes that approach.
+- 2026-10-04: Done: Reviewed round 1: five new tests in server/rootmissing_test.go cover the missing-root shutdown; all seven Context mutations fail at least one. Skipping the escape test on Windows accepted by Scott Schlesier, since '<' can't be in a Windows file name.
