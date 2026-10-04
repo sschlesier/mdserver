@@ -78,6 +78,31 @@ func TestDotSegmentsAreNotServed(t *testing.T) {
 	}
 }
 
+// The mux cleans ".." before handlers run, so outside-root paths are checked directly.
+func TestOutsideRootPathsStayForbidden(t *testing.T) {
+	root := t.TempDir()
+	s := NewServer(Config{Host: "localhost", RootDir: root})
+
+	for _, rel := range []string{"../x", "../x.md", "../.env", "../../etc/passwd"} {
+		p := filepath.Join(root, rel)
+		if s.isValidPath(p) {
+			t.Errorf("isValidPath(%q) = true, want false", rel)
+		}
+		if s.isHiddenPath(p) {
+			t.Errorf("isHiddenPath(%q) = true, want false (outside root keeps 403)", rel)
+		}
+	}
+
+	// A name that merely starts with ".." is a dot segment inside the root.
+	p := filepath.Join(root, "..foo")
+	if !s.isHiddenPath(p) {
+		t.Errorf("isHiddenPath(..foo) = false, want true")
+	}
+	if s.isValidPath(p) {
+		t.Errorf("isValidPath(..foo) = true, want false")
+	}
+}
+
 func TestDotRootDirStillServed(t *testing.T) {
 	root := filepath.Join(t.TempDir(), ".notes")
 	if err := os.MkdirAll(root, 0755); err != nil {
