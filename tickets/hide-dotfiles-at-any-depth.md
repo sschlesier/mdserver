@@ -4,7 +4,7 @@ id: era-sib
 type: bug
 priority: 1
 approved: "Scott Schlesier, 2026-09-30: approved after review of PR #3 findings. Cold read: pass"
-status: in-review
+status: done
 ---
 
 No URL serves, renders or lists a file or directory under the root whose path has any segment
@@ -74,3 +74,9 @@ Out of scope:
   equivalent mutants: dropping the hidden check in `handleIndex` or `handleStaticFile` (every
   caller is already guarded in `handleRequest`; the copies are defence in depth per Design), skipping `..` in `hasDotSegment` (`filepath.Rel` never yields `..` mid-path),
   and the `filepath.Abs` error branch (unreachable). `claude -p "/code-review 9"`: no findings.
+- 2026-10-04: Manual repro run by Scott Schlesier against a real listener: `/docs/.env`, `/.hidden/`,
+  `/.hidden`, `/.hidden/a.md`, `/.env` all 404; `/docs/ok.md` and `/docs/` 200; `/%2e%2e/x` 301
+  (mux redirect to the cleaned path, no content served). Symlink-to-dot-target clearing confirmed
+  by Scott Schlesier.
+- 2026-10-04: Done: Reviewed round 1: all criteria verified, manual repro confirmed; no open
+  decisions or unproven risks left. Records the review result, not acceptance.
