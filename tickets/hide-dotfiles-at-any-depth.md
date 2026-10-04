@@ -31,14 +31,14 @@ Out of scope:
 
 ## Acceptance criteria
 
-- [ ] A request whose path has any segment starting with `.` (other than the URL-cleaned `.`
+- [x] A request whose path has any segment starting with `.` (other than the URL-cleaned `.`
       and `..`) gets 404, for markdown, static files, `/assets/` and directories. Cases:
       `/docs/.env`, `/notes/.secret.md`, `/.hidden/`, `/.hidden` (404, not a redirect to
       `/.hidden/`), `/.hidden/a.md`, `/.hidden/a`, `/assets/docs/.env`, `/assets/.env`, and
       the same paths URL-encoded (`%2e`).
-- [ ] Top-level dotfiles (`/.env`) also get 404; today they get 403.
-- [ ] Files and directories without a dot segment are served as before (existing tests pass).
-- [ ] A table-driven test covers every case above.
+- [x] Top-level dotfiles (`/.env`) also get 404; today they get 403.
+- [x] Files and directories without a dot segment are served as before (existing tests pass).
+- [x] A table-driven test covers every case above.
 
 ## Verification
 
@@ -64,3 +64,6 @@ Out of scope:
   root named with a leading dot.
 - 2026-09-30: Approved: Scott Schlesier, 2026-09-30: approved after review of PR #3 findings. Cold read: pass
 - 2026-10-03: Started on branch hide-dotfiles-at-any-depth
+- 2026-10-03: Implemented. `go test ./...` passes; with the fix reverted the new table test
+  fails on all 19 blocked cases. The manual curl repro was not run (the command was denied);
+  the httptest table drives the same requests through the real handler.
