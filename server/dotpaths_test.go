@@ -96,6 +96,12 @@ func TestOutsideRootPathsStayForbidden(t *testing.T) {
 		}
 	}
 
+	for name, p := range map[string]string{"root": root, "root parent": filepath.Join(root, "..")} {
+		if s.isValidPath(p) {
+			t.Errorf("isValidPath(%s) = true, want false", name)
+		}
+	}
+
 	// A name that merely starts with ".." is a dot segment inside the root.
 	p := filepath.Join(root, "..foo")
 	if !s.isHiddenPath(p) {
