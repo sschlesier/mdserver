@@ -66,3 +66,4 @@ Out of scope:
   - Start not waiting for shutdown: TestStartWaitsForInFlightRequestOnRootMissing
 - 2026-10-03: The Go client strips the Connection header and reports it as resp.Close, so that test checks resp.Close.
 - 2026-10-03: Review started
+- 2026-10-03: Round 1 triage. Dismissed: dropping the 410 page's Content-Type header survives the suite; no criterion or invariant requires a test for it. Cleared by the spec: chmod 000 depends on os.Stat returning EACCES; the spec prescribes that approach.
