@@ -25,17 +25,17 @@ Out of scope:
 
 ## Acceptance criteria
 
-- [ ] A test serves a root whose name contains `<` and `&`, removes it, and checks that the
+- [x] A test serves a root whose name contains `<` and `&`, removes it, and checks that the
       410 body contains the HTML-escaped absolute path.
-- [ ] A test checks that the 410 response arrives within 1s of the request and has
+- [x] A test checks that the 410 response arrives within 1s of the request and has
       `Connection: close`.
-- [ ] A test makes the root's parent unsearchable (`chmod 000`), checks that a request gets a
+- [x] A test makes the root's parent unsearchable (`chmod 000`), checks that a request gets a
       non-410 response and the server keeps running, then restores it. It's skipped when
       running as root and on Windows.
-- [ ] A test replaces the root with a regular file and checks for 410 and `ErrRootMissing`.
-- [ ] A test holds a request in flight, removes the root, releases the request within the
+- [x] A test replaces the root with a regular file and checks for 410 and `ErrRootMissing`.
+- [x] A test holds a request in flight, removes the root, releases the request within the
       shutdown timeout, and checks that `Start` doesn't return before that request finishes.
-- [ ] For each change listed in Context, at least one new test fails when that change is
+- [x] For each change listed in Context, at least one new test fails when that change is
       applied by hand (record which one in the Log).
 
 ## Verification
@@ -56,3 +56,12 @@ Out of scope:
 ## Log
 - 2026-09-30: Approved: Scott Schlesier, 2026-09-30: approved after review of PR #3 findings. Cold read: not run
 - 2026-10-03: Started on branch add-root-missing-shutdown-tests
+- 2026-10-03: Implemented in server/rootmissing_test.go; no non-test code changed. Each Context mutation applied by hand to server/server.go and caught:
+  - drop folder name from the 410 page: TestMissingRootNoticeEscapesRootPath
+  - drop html.EscapeString: TestMissingRootNoticeEscapesRootPath
+  - every stat error treated as missing: TestUnreadableRootParentIsNotTreatedAsMissing
+  - regular file at root not missing: TestRootReplacedByFileIsMissing
+  - drop Connection: close: TestMissingRootNoticeIsPromptAndClosesConnection
+  - synchronous Shutdown: TestMissingRootNoticeIsPromptAndClosesConnection (and four others)
+  - Start not waiting for shutdown: TestStartWaitsForInFlightRequestOnRootMissing
+- 2026-10-03: The Go client strips the Connection header and reports it as resp.Close, so that test checks resp.Close.
