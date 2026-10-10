@@ -230,64 +230,14 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, dirPath str
 	}
 }
 
-// handleAssets serves static files (images, CSS, JS)
+// handleAssets serves mdserver's stylesheet at /assets/style.css. Every other
+// /assets/ path is an ordinary path under the root.
 func (s *Server) handleAssets(w http.ResponseWriter, r *http.Request) {
-	// Extract file path from request
-	requestPath := r.URL.Path
-
-	// Remove /assets/ prefix if present
-	if strings.HasPrefix(requestPath, "/assets/") {
-		requestPath = strings.TrimPrefix(requestPath, "/assets/")
-	} else if requestPath == "/assets" {
-		requestPath = ""
-	}
-
-	// If no path specified, try to serve CSS
-	if requestPath == "" || requestPath == "/" {
-		if r.URL.Path == "/assets/style.css" || strings.HasSuffix(r.URL.Path, "style.css") {
-			s.serveCSS(w, r)
-			return
-		}
-		http.NotFound(w, r)
-		return
-	}
-
-	// Check if this is a request for style.css
-	if requestPath == "style.css" {
+	if r.URL.Path == "/assets/style.css" {
 		s.serveCSS(w, r)
 		return
 	}
-
-	// Construct full file path
-	filePath := filepath.Join(s.config.RootDir, requestPath)
-
-	if s.isHiddenPath(filePath) {
-		http.NotFound(w, r)
-		return
-	}
-
-	// Validate path is within root directory
-	if !s.isValidPath(filePath) {
-		http.Error(w, "Invalid path", http.StatusForbidden)
-		return
-	}
-
-	// Check if file exists
-	info, err := os.Stat(filePath)
-	if err != nil || info.IsDir() {
-		http.NotFound(w, r)
-		return
-	}
-
-	log.Printf("file: %s", s.relPath(filePath))
-
-	// Set appropriate Content-Type
-	ext := strings.ToLower(filepath.Ext(filePath))
-	contentType := getContentType(ext)
-	w.Header().Set("Content-Type", contentType)
-
-	// Serve file
-	http.ServeFile(w, r, filePath)
+	s.handleRequest(w, r)
 }
 
 // serveCSS serves the CSS file from template directory
