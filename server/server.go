@@ -202,7 +202,7 @@ func (s *Server) handleFavicon(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, faviconPath)
 }
 
-// handleRequest handles all non-asset requests (root, markdown files, etc.)
+// handleRequest serves paths under the root: directory listings, rendered Markdown and images.
 func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 	requestPath := r.URL.Path
 
@@ -253,7 +253,7 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Not a markdown file, try to serve as static asset from root directory
+	// Not Markdown: serve it if it's an allowlisted image
 	s.handleStaticFile(w, r, filePath)
 }
 
@@ -309,7 +309,7 @@ func (s *Server) isHiddenPath(filePath string) bool {
 	return hasDotSegment(rel)
 }
 
-// handleStaticFile serves a static file from the root directory
+// handleStaticFile serves an allowlisted image from the root directory; anything else gets 404.
 func (s *Server) handleStaticFile(w http.ResponseWriter, r *http.Request, filePath string) {
 	if s.isHiddenPath(filePath) {
 		http.NotFound(w, r)
