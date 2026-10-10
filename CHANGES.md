@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** `/assets/<path>` now serves `<root>/assets/<path>`, so relative links into a folder's own `assets/` directory work. It used to serve `<root>/<path>`. `/assets/style.css` is still mdserver's stylesheet
+- Serve only Markdown (rendered) and images (`.png .jpg .jpeg .gif .svg .webp`) from the served directory; any other file, such as `.html`, `.js`, `.json` or `.txt`, gets 404
+- Render `.md` files in any case (`.MD`, `.Md`)
+- Serve images with `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; form-action 'none'` and `X-Content-Type-Options: nosniff`, so scripts and forms in an SVG opened directly don't run
+
 ## v2.1.0
 
 - Shut down when the served directory is deleted or moved: the next request gets a "folder missing, shutting down" page, and with live reload on the server exits as soon as the file watcher notices

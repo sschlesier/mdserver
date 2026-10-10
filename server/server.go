@@ -154,8 +154,8 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("/favicon.ico", s.handleFavicon)
 	s.mux.HandleFunc("/favicon.svg", s.handleFavicon)
 
-	// Static assets handler (must be registered first for /assets/ path)
-	s.mux.HandleFunc("/assets/", s.handleAssets)
+	// mdserver's stylesheet. Every other /assets/ path is an ordinary path under the root.
+	s.mux.HandleFunc("/assets/style.css", s.serveCSS)
 
 	// LiveReload WebSocket endpoint
 	if s.liveReload != nil {
@@ -202,7 +202,7 @@ func (s *Server) handleFavicon(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, faviconPath)
 }
 
-// handleRequest handles all non-asset requests (root, markdown files, etc.)
+// handleRequest serves paths under the root: directory listings, rendered Markdown and images.
 func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 	requestPath := r.URL.Path
 
@@ -239,7 +239,7 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	// Check if it's a markdown file (has .md extension or no extension)
 	ext := filepath.Ext(filePath)
-	if ext == ".md" {
+	if strings.EqualFold(ext, ".md") {
 		if s.isValidPath(filePath) {
 			s.handleMarkdown(w, r, filePath)
 			return
@@ -253,7 +253,7 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Not a markdown file, try to serve as static asset from root directory
+	// Not Markdown: serve it if it's an allowlisted image
 	s.handleStaticFile(w, r, filePath)
 }
 
@@ -309,7 +309,7 @@ func (s *Server) isHiddenPath(filePath string) bool {
 	return hasDotSegment(rel)
 }
 
-// handleStaticFile serves a static file from the root directory
+// handleStaticFile serves an allowlisted image from the root directory; anything else gets 404.
 func (s *Server) handleStaticFile(w http.ResponseWriter, r *http.Request, filePath string) {
 	if s.isHiddenPath(filePath) {
 		http.NotFound(w, r)
@@ -329,14 +329,20 @@ func (s *Server) handleStaticFile(w http.ResponseWriter, r *http.Request, filePa
 		return
 	}
 
+	contentType, ok := imageContentType(filepath.Ext(filePath))
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+
 	log.Printf("file: %s", s.relPath(filePath))
 
-	// Set appropriate Content-Type based on extension
-	ext := strings.ToLower(filepath.Ext(filePath))
-	contentType := getContentType(ext)
 	w.Header().Set("Content-Type", contentType)
+	// An SVG opened directly is a document on mdserver's origin; keep its scripts and forms from
+	// running. form-action has no default-src fallback, so it must be set on its own.
+	w.Header().Set("Content-Security-Policy", imageCSP)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 
-	// Serve file
 	http.ServeFile(w, r, filePath)
 }
 
@@ -353,30 +359,23 @@ func (s *Server) relPath(path string) string {
 	return rel
 }
 
-// getContentType returns the MIME type for a file extension
-func getContentType(ext string) string {
-	switch ext {
-	case ".html", ".htm":
-		return "text/html; charset=utf-8"
-	case ".css":
-		return "text/css; charset=utf-8"
-	case ".js":
-		return "application/javascript; charset=utf-8"
-	case ".json":
-		return "application/json; charset=utf-8"
-	case ".png":
-		return "image/png"
-	case ".jpg", ".jpeg":
-		return "image/jpeg"
-	case ".gif":
-		return "image/gif"
-	case ".svg":
-		return "image/svg+xml"
-	case ".webp":
-		return "image/webp"
-	case ".ico":
-		return "image/x-icon"
-	default:
-		return "application/octet-stream"
-	}
+// imageTypes lists the image extensions served from the root, with their MIME types.
+// Markdown is rendered separately; any other file under the root gets 404.
+var imageTypes = map[string]string{
+	".png":  "image/png",
+	".jpg":  "image/jpeg",
+	".jpeg": "image/jpeg",
+	".gif":  "image/gif",
+	".svg":  "image/svg+xml",
+	".webp": "image/webp",
+}
+
+// imageCSP is sent with every image served from the root. It blocks scripts and forms, and
+// allows the inline styles and data: images and fonts that self-contained SVG diagrams use.
+const imageCSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; form-action 'none'"
+
+// imageContentType returns the MIME type for an image extension, ignoring case.
+func imageContentType(ext string) (string, bool) {
+	ct, ok := imageTypes[strings.ToLower(ext)]
+	return ct, ok
 }

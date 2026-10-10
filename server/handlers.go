@@ -1,8 +1,10 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"log"
 	"net/http"
 	"net/url"
@@ -31,6 +33,10 @@ func (s *Server) handleMarkdown(w http.ResponseWriter, r *http.Request, filePath
 	}
 	// Read markdown file
 	content, err := os.ReadFile(filePath)
+	if errors.Is(err, fs.ErrNotExist) {
+		http.NotFound(w, r)
+		return
+	}
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to read file: %v", err), http.StatusNotFound)
 		return
@@ -228,66 +234,6 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, dirPath str
 		http.Error(w, "Failed to render template", http.StatusInternalServerError)
 		return
 	}
-}
-
-// handleAssets serves static files (images, CSS, JS)
-func (s *Server) handleAssets(w http.ResponseWriter, r *http.Request) {
-	// Extract file path from request
-	requestPath := r.URL.Path
-
-	// Remove /assets/ prefix if present
-	if strings.HasPrefix(requestPath, "/assets/") {
-		requestPath = strings.TrimPrefix(requestPath, "/assets/")
-	} else if requestPath == "/assets" {
-		requestPath = ""
-	}
-
-	// If no path specified, try to serve CSS
-	if requestPath == "" || requestPath == "/" {
-		if r.URL.Path == "/assets/style.css" || strings.HasSuffix(r.URL.Path, "style.css") {
-			s.serveCSS(w, r)
-			return
-		}
-		http.NotFound(w, r)
-		return
-	}
-
-	// Check if this is a request for style.css
-	if requestPath == "style.css" {
-		s.serveCSS(w, r)
-		return
-	}
-
-	// Construct full file path
-	filePath := filepath.Join(s.config.RootDir, requestPath)
-
-	if s.isHiddenPath(filePath) {
-		http.NotFound(w, r)
-		return
-	}
-
-	// Validate path is within root directory
-	if !s.isValidPath(filePath) {
-		http.Error(w, "Invalid path", http.StatusForbidden)
-		return
-	}
-
-	// Check if file exists
-	info, err := os.Stat(filePath)
-	if err != nil || info.IsDir() {
-		http.NotFound(w, r)
-		return
-	}
-
-	log.Printf("file: %s", s.relPath(filePath))
-
-	// Set appropriate Content-Type
-	ext := strings.ToLower(filepath.Ext(filePath))
-	contentType := getContentType(ext)
-	w.Header().Set("Content-Type", contentType)
-
-	// Serve file
-	http.ServeFile(w, r, filePath)
 }
 
 // serveCSS serves the CSS file from template directory
@@ -690,8 +636,15 @@ func extractTitle(content, filename string) string {
 			return strings.TrimPrefix(line, "# ")
 		}
 	}
-	// Remove .md extension from filename
-	return strings.TrimSuffix(filename, ".md")
+	return trimMarkdownExt(filename)
+}
+
+// trimMarkdownExt removes a .md extension in any case from name.
+func trimMarkdownExt(name string) string {
+	if ext := filepath.Ext(name); strings.EqualFold(ext, ".md") {
+		return strings.TrimSuffix(name, ext)
+	}
+	return name
 }
 
 // createBreadcrumbs generates breadcrumb navigation from a relative path
@@ -751,8 +704,7 @@ func createBreadcrumbs(relPath string) []Breadcrumb {
 
 	// If this is a file, add the filename as the final breadcrumb
 	if isFile {
-		// Remove .md extension from display
-		displayName := strings.TrimSuffix(filename, ".md")
+		displayName := trimMarkdownExt(filename)
 
 		// Build the full URL path for the file
 		relSlash := filepath.ToSlash(relPath)

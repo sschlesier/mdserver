@@ -14,6 +14,7 @@ func TestDotSegmentsAreNotServed(t *testing.T) {
 		"docs/.env":        "SECRET",
 		"docs/ok.md":       "# ok",
 		"docs/pic.png":     "png",
+		"assets/pic.png":   "png",
 		"notes/.secret.md": "# secret",
 		".env":             "SECRET",
 		".hidden/a.md":     "# a",
@@ -66,7 +67,8 @@ func TestDotSegmentsAreNotServed(t *testing.T) {
 		{"/docs/", http.StatusOK},
 		{"/docs/ok.md", http.StatusOK},
 		{"/docs/pic.png", http.StatusOK},
-		{"/assets/docs/pic.png", http.StatusOK},
+		{"/assets/pic.png", http.StatusOK},
+		{"/assets/docs/pic.png", http.StatusNotFound},
 	}
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
