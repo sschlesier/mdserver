@@ -95,6 +95,8 @@ func TestOnlyMarkdownAndImagesAreServed(t *testing.T) {
 		// mdserver's own files and pages
 		{"/", http.StatusOK, "text/html", false},
 		{"/assets/style.css", http.StatusOK, "text/css", false},
+		{"/assets/sub/style.css", http.StatusNotFound, "", false},
+		{"/assets/x-style.css", http.StatusNotFound, "", false},
 		{"/favicon.svg", http.StatusOK, "image/svg+xml", false},
 		{"/favicon.ico", http.StatusOK, "image/svg+xml", false},
 	}
@@ -122,6 +124,29 @@ func TestOnlyMarkdownAndImagesAreServed(t *testing.T) {
 				t.Errorf("GET %s has image headers (CSP %q, X-Content-Type-Options %q), want none", tt.path, csp, nosniff)
 			}
 		})
+	}
+}
+
+// Outside the root is 403 before the missing-file and allowlist checks give 404.
+func TestOutsideRootIsForbiddenBeforeAllowlist(t *testing.T) {
+	base := t.TempDir()
+	root := filepath.Join(base, "root")
+	if err := os.MkdirAll(root, 0755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"outside.png", "outside.txt", "x.MD"} {
+		if err := os.WriteFile(filepath.Join(base, name), []byte("x"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	h := NewServer(Config{Host: "localhost", RootDir: root}).httpServer.Handler
+
+	for _, p := range []string{"/..%2foutside.png", "/..%2foutside.txt", "/..%2fmissing.png", "/..%2fx.MD", "/assets/..%2f..%2fx.MD"} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, p, nil))
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("GET %s = %d, want 403", p, rec.Code)
+		}
 	}
 }
 
