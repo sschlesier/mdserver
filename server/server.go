@@ -154,8 +154,8 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("/favicon.ico", s.handleFavicon)
 	s.mux.HandleFunc("/favicon.svg", s.handleFavicon)
 
-	// Static assets handler (must be registered first for /assets/ path)
-	s.mux.HandleFunc("/assets/", s.handleAssets)
+	// mdserver's stylesheet. Every other /assets/ path is an ordinary path under the root.
+	s.mux.HandleFunc("/assets/style.css", s.serveCSS)
 
 	// LiveReload WebSocket endpoint
 	if s.liveReload != nil {

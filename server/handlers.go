@@ -230,16 +230,6 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, dirPath str
 	}
 }
 
-// handleAssets serves mdserver's stylesheet at /assets/style.css. Every other
-// /assets/ path is an ordinary path under the root.
-func (s *Server) handleAssets(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == "/assets/style.css" {
-		s.serveCSS(w, r)
-		return
-	}
-	s.handleRequest(w, r)
-}
-
 // serveCSS serves the CSS file from template directory
 func (s *Server) serveCSS(w http.ResponseWriter, r *http.Request) {
 	// Try to find template directory relative to executable or current directory
