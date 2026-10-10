@@ -329,14 +329,19 @@ func (s *Server) handleStaticFile(w http.ResponseWriter, r *http.Request, filePa
 		return
 	}
 
+	contentType, ok := imageContentType(filepath.Ext(filePath))
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+
 	log.Printf("file: %s", s.relPath(filePath))
 
-	// Set appropriate Content-Type based on extension
-	ext := strings.ToLower(filepath.Ext(filePath))
-	contentType := getContentType(ext)
 	w.Header().Set("Content-Type", contentType)
+	// An SVG opened directly is a document on mdserver's origin; keep its scripts from running.
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 
-	// Serve file
 	http.ServeFile(w, r, filePath)
 }
 
@@ -353,30 +358,19 @@ func (s *Server) relPath(path string) string {
 	return rel
 }
 
-// getContentType returns the MIME type for a file extension
-func getContentType(ext string) string {
-	switch ext {
-	case ".html", ".htm":
-		return "text/html; charset=utf-8"
-	case ".css":
-		return "text/css; charset=utf-8"
-	case ".js":
-		return "application/javascript; charset=utf-8"
-	case ".json":
-		return "application/json; charset=utf-8"
-	case ".png":
-		return "image/png"
-	case ".jpg", ".jpeg":
-		return "image/jpeg"
-	case ".gif":
-		return "image/gif"
-	case ".svg":
-		return "image/svg+xml"
-	case ".webp":
-		return "image/webp"
-	case ".ico":
-		return "image/x-icon"
-	default:
-		return "application/octet-stream"
-	}
+// imageTypes lists the image extensions served from the root, with their MIME types.
+// Markdown is rendered separately; any other file under the root gets 404.
+var imageTypes = map[string]string{
+	".png":  "image/png",
+	".jpg":  "image/jpeg",
+	".jpeg": "image/jpeg",
+	".gif":  "image/gif",
+	".svg":  "image/svg+xml",
+	".webp": "image/webp",
+}
+
+// imageContentType returns the MIME type for an image extension, ignoring case.
+func imageContentType(ext string) (string, bool) {
+	ct, ok := imageTypes[strings.ToLower(ext)]
+	return ct, ok
 }
