@@ -239,7 +239,7 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	// Check if it's a markdown file (has .md extension or no extension)
 	ext := filepath.Ext(filePath)
-	if ext == ".md" {
+	if strings.EqualFold(ext, ".md") {
 		if s.isValidPath(filePath) {
 			s.handleMarkdown(w, r, filePath)
 			return
