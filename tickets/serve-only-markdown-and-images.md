@@ -46,8 +46,10 @@ Out of scope:
 - [ ] mdserver's own assets still load: a rendered page gets its stylesheet, favicon and live
       reload.
 - [ ] Every image served from the root carries
-      `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'` and
-      `X-Content-Type-Options: nosniff`, so a script inside an SVG opened directly doesn't run.
+      `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; form-action 'none'`
+      and `X-Content-Type-Options: nosniff`, so a script or form inside an SVG opened directly
+      doesn't run, while its embedded `data:` images and fonts still render. (Changed in review
+      round 1.)
       Rendered pages, directory listings and mdserver's own files don't get these headers.
 - [ ] A table-driven test covers the allowed and blocked extensions above, and checks the
       image headers.
@@ -126,3 +128,12 @@ Out of scope:
   `+ ".MD"` is equivalent on macOS's case-insensitive filesystem and killed by `/a` on Linux CI;
   `renderer/markdown.go` `extractTitle` still strips only lowercase `.md`, but `--render` is out of
   scope.
+- 2026-10-10: Review round 1, pass 1 again. Dismissed: the duplicate hidden-path check in
+  `handleStaticFile` is defence in depth kept from `hide-dotfiles-at-any-depth`; stat before the
+  allowlist check is the Design's check order. Cleared by context: `/assets/` with no `assets/`
+  directory renders `root/assets.md` ("treated as any other folder"); confirmed by Scott
+  Schlesier.
+- 2026-10-10: Decisions (Scott Schlesier): 1. A missing extensionless `.md` returns a plain 404,
+  not a body with the root's absolute path. 2. Criterion 6 changed: the image CSP also allows
+  `data:` images and fonts and sets `form-action 'none'`. 3. Browser checks (screenshot of
+  `/a.md`, live reload, `<img>`-embedded SVG) to be done by Scott Schlesier.
