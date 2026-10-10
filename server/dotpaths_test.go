@@ -58,7 +58,6 @@ func TestDotSegmentsAreNotServed(t *testing.T) {
 		{"/%2ehidden/a.md", http.StatusNotFound},
 		{"/assets/docs/%2eenv", http.StatusNotFound},
 		{"/assets/%2eenv", http.StatusNotFound},
-		{"/.hidden/.", http.StatusTemporaryRedirect}, // mux redirects to /.hidden/, which is 404
 		{"/%2ehidden%2fa.md", http.StatusNotFound},
 		{"/docs%2f%2eenv", http.StatusNotFound},
 		{"/", http.StatusOK},
@@ -78,6 +77,14 @@ func TestDotSegmentsAreNotServed(t *testing.T) {
 				t.Errorf("GET %s = %d, want %d", tt.path, rec.Code, tt.want)
 			}
 		})
+	}
+
+	// The mux redirects /.hidden/. to the cleaned /.hidden, which is 404 above. The redirect
+	// status varies by Go version (301 in 1.25, 307 in 1.27).
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/.hidden/.", nil))
+	if rec.Code < 300 || rec.Code > 399 || rec.Header().Get("Location") != "/.hidden" {
+		t.Errorf("GET /.hidden/. = %d to %q, want a redirect to /.hidden", rec.Code, rec.Header().Get("Location"))
 	}
 }
 
