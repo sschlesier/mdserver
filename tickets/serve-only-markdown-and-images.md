@@ -5,6 +5,7 @@ type: bug
 priority: 2
 depends-on: [era-sib]
 approved: "Scott Schlesier, 2026-10-10: approved after cold read and SVG header decision. Cold read: pass"
+status: in-review
 ---
 
 mdserver serves only Markdown (rendered) and image files from the served folder, and any other
@@ -110,3 +111,11 @@ Out of scope:
   (Scott Schlesier): add CSP and nosniff headers to served images.
 - 2026-10-10: Approved: Scott Schlesier, 2026-10-10: approved after cold read and SVG header decision. Cold read: pass
 - 2026-10-10: Started on branch serve-only-markdown-and-images
+- 2026-10-10: Implemented. `go vet ./...` and `go test -race ./...` pass. Step 3 was committed
+  before Step 1 so each commit builds (Step 1 removes `getContentType`, which `handleAssets`
+  called); the `dotpaths_test.go` fixture change went with Step 3. Manual check: `curl -i` gives
+  404 for `/x.html` and `/data.json`, and 200 `image/png` with CSP and nosniff for `/img.png`;
+  `/a.md` renders `<img src="img.png">`. The screenshot was not taken: headless Chrome was
+  blocked by the worktree guard. 404 responses carry `X-Content-Type-Options: nosniff` because
+  Go's `http.NotFound` sets it; the test checks for the image headers' absence only on 200s.
+- 2026-10-10: Review started
