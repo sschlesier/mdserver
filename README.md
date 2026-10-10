@@ -36,7 +36,7 @@ mdserver --version
 ## Features
 
 - Fast Markdown to HTML rendering with GitHub Flavored Markdown support
-- Static asset serving (images, CSS, JS)
+- Image serving (`.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`, `.webp`); other non-Markdown files get 404
 - Directory index browsing
 - Auto port selection
 - Single binary distribution
