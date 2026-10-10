@@ -640,8 +640,15 @@ func extractTitle(content, filename string) string {
 			return strings.TrimPrefix(line, "# ")
 		}
 	}
-	// Remove .md extension from filename
-	return strings.TrimSuffix(filename, ".md")
+	return trimMarkdownExt(filename)
+}
+
+// trimMarkdownExt removes a .md extension in any case from name.
+func trimMarkdownExt(name string) string {
+	if ext := filepath.Ext(name); strings.EqualFold(ext, ".md") {
+		return strings.TrimSuffix(name, ext)
+	}
+	return name
 }
 
 // createBreadcrumbs generates breadcrumb navigation from a relative path
@@ -701,8 +708,7 @@ func createBreadcrumbs(relPath string) []Breadcrumb {
 
 	// If this is a file, add the filename as the final breadcrumb
 	if isFile {
-		// Remove .md extension from display
-		displayName := strings.TrimSuffix(filename, ".md")
+		displayName := trimMarkdownExt(filename)
 
 		// Build the full URL path for the file
 		relSlash := filepath.ToSlash(relPath)
