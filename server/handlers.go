@@ -1,8 +1,10 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"log"
 	"net/http"
 	"net/url"
@@ -31,6 +33,10 @@ func (s *Server) handleMarkdown(w http.ResponseWriter, r *http.Request, filePath
 	}
 	// Read markdown file
 	content, err := os.ReadFile(filePath)
+	if errors.Is(err, fs.ErrNotExist) {
+		http.NotFound(w, r)
+		return
+	}
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to read file: %v", err), http.StatusNotFound)
 		return

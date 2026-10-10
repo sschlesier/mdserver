@@ -127,6 +127,25 @@ func TestOnlyMarkdownAndImagesAreServed(t *testing.T) {
 	}
 }
 
+func TestMissingMarkdownIsPlainNotFound(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "Makefile"), []byte("all:"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	h := NewServer(Config{Host: "localhost", RootDir: root}).httpServer.Handler
+
+	for _, p := range []string{"/Makefile", "/nope", "/nope.md", "/assets/foo"} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, p, nil))
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("GET %s = %d, want 404", p, rec.Code)
+		}
+		if body := rec.Body.String(); body != "404 page not found\n" {
+			t.Errorf("GET %s body = %q, want the plain 404", p, body)
+		}
+	}
+}
+
 // Outside the root is 403 before the missing-file and allowlist checks give 404.
 func TestOutsideRootIsForbiddenBeforeAllowlist(t *testing.T) {
 	base := t.TempDir()
