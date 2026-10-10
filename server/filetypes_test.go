@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-const imageCSP = "default-src 'none'; style-src 'unsafe-inline'"
+const wantImageCSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; form-action 'none'"
 
 func TestOnlyMarkdownAndImagesAreServed(t *testing.T) {
 	root := t.TempDir()
@@ -113,8 +113,8 @@ func TestOnlyMarkdownAndImagesAreServed(t *testing.T) {
 			csp := rec.Header().Get("Content-Security-Policy")
 			nosniff := rec.Header().Get("X-Content-Type-Options")
 			if tt.imageHdrs {
-				if csp != imageCSP {
-					t.Errorf("GET %s Content-Security-Policy = %q, want %q", tt.path, csp, imageCSP)
+				if csp != wantImageCSP {
+					t.Errorf("GET %s Content-Security-Policy = %q, want %q", tt.path, csp, wantImageCSP)
 				}
 				if nosniff != "nosniff" {
 					t.Errorf("GET %s X-Content-Type-Options = %q, want nosniff", tt.path, nosniff)

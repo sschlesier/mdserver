@@ -338,8 +338,9 @@ func (s *Server) handleStaticFile(w http.ResponseWriter, r *http.Request, filePa
 	log.Printf("file: %s", s.relPath(filePath))
 
 	w.Header().Set("Content-Type", contentType)
-	// An SVG opened directly is a document on mdserver's origin; keep its scripts from running.
-	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'")
+	// An SVG opened directly is a document on mdserver's origin; keep its scripts and forms from
+	// running. form-action has no default-src fallback, so it must be set on its own.
+	w.Header().Set("Content-Security-Policy", imageCSP)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 
 	http.ServeFile(w, r, filePath)
@@ -368,6 +369,10 @@ var imageTypes = map[string]string{
 	".svg":  "image/svg+xml",
 	".webp": "image/webp",
 }
+
+// imageCSP is sent with every image served from the root. It blocks scripts and forms, and
+// allows the inline styles and data: images and fonts that self-contained SVG diagrams use.
+const imageCSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; form-action 'none'"
 
 // imageContentType returns the MIME type for an image extension, ignoring case.
 func imageContentType(ext string) (string, bool) {
