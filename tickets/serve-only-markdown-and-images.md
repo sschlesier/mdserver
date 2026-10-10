@@ -119,3 +119,10 @@ Out of scope:
   blocked by the worktree guard. 404 responses carry `X-Content-Type-Options: nosniff` because
   Go's `http.NotFound` sets it; the test checks for the image headers' absence only on 200s.
 - 2026-10-10: Review started
+- 2026-10-10: Review round 1 triage. Fixed: `handleAssets` replaced by a direct
+  `/assets/style.css` route; stale handler comments; added tests for `/assets/*style.css` not
+  being mdserver's CSS, the outside-root 403 coming before the allowlist 404, and the outside-root
+  guard on the `.MD` branch (both mutants T2 and T4 now killed). Dismissed: mutant `+ ".md"` →
+  `+ ".MD"` is equivalent on macOS's case-insensitive filesystem and killed by `/a` on Linux CI;
+  `renderer/markdown.go` `extractTitle` still strips only lowercase `.md`, but `--render` is out of
+  scope.
