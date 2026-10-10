@@ -5,7 +5,7 @@ type: bug
 priority: 2
 depends-on: [era-sib]
 approved: "Scott Schlesier, 2026-10-10: approved after cold read and SVG header decision. Cold read: pass"
-status: in-review
+status: done
 ---
 
 mdserver serves only Markdown (rendered) and image files from the served folder, and any other
@@ -33,27 +33,27 @@ Out of scope:
 
 ## Acceptance criteria
 
-- [ ] Files ending in `.md` in any case (`.md`, `.MD`, `.Md`) are rendered, including
+- [x] Files ending in `.md` in any case (`.md`, `.MD`, `.Md`) are rendered, including
       extensionless URLs that resolve to `.md`. The directory listing's links to them open.
-- [ ] `.png .jpg .jpeg .gif .svg .webp` files under the root are served with their image MIME
+- [x] `.png .jpg .jpeg .gif .svg .webp` files under the root are served with their image MIME
       type. The extension match ignores case (`.PNG` works).
-- [ ] `/assets/<path>` resolves to `root/assets/<path>` under the same rules as any other URL:
+- [x] `/assets/<path>` resolves to `root/assets/<path>` under the same rules as any other URL:
       `/assets/logo.png` serves `root/assets/logo.png`, `/assets/page.md` renders
       `root/assets/page.md`, and `/assets/logo.png` no longer serves `root/logo.png`.
-- [ ] Any other file under the root gets 404: for
+- [x] Any other file under the root gets 404: for
       example `.html`, `.htm`, `.css`, `.js`, `.json`, `.txt`, `.pdf`, `.go`, and files with
       no extension.
-- [ ] mdserver's own assets still load: a rendered page gets its stylesheet, favicon and live
+- [x] mdserver's own assets still load: a rendered page gets its stylesheet, favicon and live
       reload.
-- [ ] Every image served from the root carries
+- [x] Every image served from the root carries
       `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; form-action 'none'`
       and `X-Content-Type-Options: nosniff`, so a script or form inside an SVG opened directly
       doesn't run, while its embedded `data:` images and fonts still render. (Changed in review
       round 1.)
       Rendered pages, directory listings and mdserver's own files don't get these headers.
-- [ ] A table-driven test covers the allowed and blocked extensions above, and checks the
+- [x] A table-driven test covers the allowed and blocked extensions above, and checks the
       image headers.
-- [ ] README.md no longer says CSS and JS are served, and CHANGES.md has an unreleased entry
+- [x] README.md no longer says CSS and JS are served, and CHANGES.md has an unreleased entry
       for the `/assets/` remap, the 404 for other file types, and the image headers.
 
 ## Verification
@@ -137,3 +137,10 @@ Out of scope:
   not a body with the root's absolute path. 2. Criterion 6 changed: the image CSP also allows
   `data:` images and fonts and sets `form-action 'none'`. 3. Browser checks (screenshot of
   `/a.md`, live reload, `<img>`-embedded SVG) to be done by Scott Schlesier.
+- 2026-10-10: Browser check by Scott Schlesier against the branch build: `/a.md` shows the PNG
+  and an `<img>`-embedded SVG with a `data:` image; `diagram.svg` opened directly shows its
+  `data:` image; `evil.svg` opened directly runs no script and its form post is blocked; live
+  reload updated an open tab on save.
+- 2026-10-10: Done: Reviewed round 1: all 8 criteria verified (tests fail on revert; browser
+  check by Scott Schlesier); decisions applied (plain 404 for missing Markdown, image CSP with
+  `form-action 'none'` and `data:` images and fonts); no open decisions or unproven risks.
