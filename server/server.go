@@ -44,9 +44,6 @@ type Server struct {
 	httpServer *http.Server
 	templates  templates
 
-	// binaryModTime is the Last-Modified time for the embedded files.
-	binaryModTime time.Time
-
 	rootGone     chan struct{}
 	rootGoneOnce sync.Once
 	shutdownDone chan struct{}
@@ -57,12 +54,11 @@ type Server struct {
 // NewServer creates a new server instance
 func NewServer(config Config) *Server {
 	s := &Server{
-		config:        config,
-		templates:     parseTemplates(config.EnableLiveReload),
-		binaryModTime: binaryModTime(),
-		mux:           http.NewServeMux(),
-		rootGone:      make(chan struct{}),
-		shutdownDone:  make(chan struct{}),
+		config:       config,
+		templates:    parseTemplates(config.EnableLiveReload),
+		mux:          http.NewServeMux(),
+		rootGone:     make(chan struct{}),
+		shutdownDone: make(chan struct{}),
 	}
 	s.httpServer = &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", config.Host, config.Port),
@@ -228,14 +224,14 @@ func (s *Server) setupRoutes() {
 // handleFavicon serves the markdown favicon
 func (s *Server) handleFavicon(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "image/svg+xml")
-	s.serveEmbedded(w, r, "favicon.svg", faviconSVG)
+	serveEmbedded(w, r, "favicon.svg", faviconSVG)
 }
 
 // serveCSS serves mdserver's stylesheet
 func (s *Server) serveCSS(w http.ResponseWriter, r *http.Request) {
 	log.Printf("file: style.css (embedded)")
 	w.Header().Set("Content-Type", "text/css; charset=utf-8")
-	s.serveEmbedded(w, r, "style.css", styleCSS)
+	serveEmbedded(w, r, "style.css", styleCSS)
 }
 
 // handleRequest serves paths under the root: directory listings, rendered Markdown and images.

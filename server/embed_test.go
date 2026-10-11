@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
 
 // newEmbedTestServer serves a root holding sub/doc.md, with live reload on so the settings
@@ -189,36 +188,12 @@ func TestLiveReloadScriptFollowsConfig(t *testing.T) {
 	}
 }
 
-// The stylesheet and favicon carry the binary's modification time as Last-Modified, and
-// answer a matching If-Modified-Since with 304.
-func TestEmbeddedFilesUseBinaryModTime(t *testing.T) {
-	exe, err := os.Executable()
-	if err != nil {
-		t.Fatal(err)
-	}
-	info, err := os.Stat(exe)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Backdate the test binary so its mtime can't be mistaken for the server's start time.
-	old := time.Date(2001, 2, 3, 4, 5, 6, 0, time.UTC)
-	if err := os.Chtimes(exe, time.Time{}, old); err != nil {
-		t.Skipf("can't change the test binary's mtime: %v", err)
-	}
-	t.Cleanup(func() { os.Chtimes(exe, time.Time{}, info.ModTime()) })
-	want := old.Format(http.TimeFormat)
-
+// The stylesheet and favicon send no Last-Modified: nothing is cached, so there's nothing to validate.
+func TestEmbeddedFilesHaveNoLastModified(t *testing.T) {
 	h := newEmbedTestServer(t)
 	for _, path := range []string{"/_mdserver/style.css", "/favicon.svg"} {
-		if got := embedGet(t, h, path).Header().Get("Last-Modified"); got != want {
-			t.Errorf("GET %s Last-Modified = %q, want %q", path, got, want)
-		}
-		req := httptest.NewRequest(http.MethodGet, path, nil)
-		req.Header.Set("If-Modified-Since", want)
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, req)
-		if rec.Code != http.StatusNotModified {
-			t.Errorf("GET %s with If-Modified-Since = %d, want 304", path, rec.Code)
+		if got := embedGet(t, h, path).Header().Get("Last-Modified"); got != "" {
+			t.Errorf("GET %s Last-Modified = %q, want none", path, got)
 		}
 	}
 }
