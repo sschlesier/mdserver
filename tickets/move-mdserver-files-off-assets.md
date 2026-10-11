@@ -5,7 +5,7 @@ type: bug
 priority: 3
 depends-on: [serve-only-markdown-and-images]
 approved: "Scott Schlesier, 2026-09-30: approved after review of PR #3 findings. Cold read: not run"
-status: in-progress
+status: in-review
 ---
 
 mdserver's own stylesheet moves to a URL prefix no served folder would use, so a folder's own
@@ -50,3 +50,4 @@ Out of scope:
 - 2026-10-11: Started on branch move-mdserver-files-off-assets
 - 2026-10-11: Started on branch move-mdserver-files-off-assets
 - 2026-10-11: Implemented. The 410 page uses inline styles, so nothing to change there. Collision note (out of scope, not moved): `/settings`, `/livereload` and `/favicon.*` can still collide with root files of those names.
+- 2026-10-11: Review started
