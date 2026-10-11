@@ -163,20 +163,6 @@ func TestStylesheetLivesOffAssets(t *testing.T) {
 	}
 }
 
-// The tests run from server/, so the pages above use the inline fallback templates; this
-// covers the template files that ship with the binary.
-func TestTemplateFilesLinkStylesheet(t *testing.T) {
-	for _, name := range []string{"page.html", "directory.html", "settings.html"} {
-		b, err := os.ReadFile(filepath.Join("..", "template", name))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !strings.Contains(string(b), `href="/_mdserver/style.css"`) {
-			t.Errorf("template/%s doesn't link mdserver's stylesheet", name)
-		}
-	}
-}
-
 func TestMissingMarkdownIsPlainNotFound(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "Makefile"), []byte("all:"), 0644); err != nil {

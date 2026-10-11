@@ -238,7 +238,10 @@ func (lr *LiveReload) verbosef(format string, args ...any) {
 
 // HandleWebSocket handles WebSocket connections for live reload
 func (lr *LiveReload) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
+	// Upgrade writes the 101 response itself, so give it the no-cache headers.
+	header := http.Header{}
+	setNoCache(header)
+	conn, err := upgrader.Upgrade(w, r, header)
 	if err != nil {
 		// log.Printf("LiveReload: WebSocket upgrade error: %v", err)
 		return

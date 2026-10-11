@@ -1,12 +1,15 @@
 package server
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"html"
+	"io"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -39,6 +42,7 @@ type Server struct {
 	mux        *http.ServeMux
 	liveReload *LiveReload
 	httpServer *http.Server
+	templates  templates
 
 	rootGone     chan struct{}
 	rootGoneOnce sync.Once
@@ -51,13 +55,14 @@ type Server struct {
 func NewServer(config Config) *Server {
 	s := &Server{
 		config:       config,
+		templates:    parseTemplates(config.EnableLiveReload),
 		mux:          http.NewServeMux(),
 		rootGone:     make(chan struct{}),
 		shutdownDone: make(chan struct{}),
 	}
 	s.httpServer = &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", config.Host, config.Port),
-		Handler: s.requireRoot(s.mux),
+		Handler: noCache(s.requireRoot(s.mux)),
 	}
 
 	// Initialize LiveReload if enabled
@@ -112,6 +117,51 @@ func (s *Server) rootExists() bool {
 		return !errors.Is(err, fs.ErrNotExist)
 	}
 	return info.IsDir()
+}
+
+// noCache tells browsers not to cache any response, so a tab always shows the
+// current content.
+func noCache(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		setNoCache(w.Header())
+		next.ServeHTTP(noCacheWriter{w}, r)
+	})
+}
+
+func setNoCache(h http.Header) {
+	h.Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	h.Set("Pragma", "no-cache")
+	h.Set("Expires", "0")
+}
+
+// noCacheWriter sets the no-cache headers again as the status is written:
+// http.ServeContent and http.ServeFile delete Cache-Control before writing an
+// error such as 416.
+type noCacheWriter struct {
+	http.ResponseWriter
+}
+
+func (w noCacheWriter) WriteHeader(code int) {
+	setNoCache(w.Header())
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w noCacheWriter) Flush() {
+	http.NewResponseController(w.ResponseWriter).Flush()
+}
+
+// Hijack lets the live reload WebSocket take over the connection.
+func (w noCacheWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return http.NewResponseController(w.ResponseWriter).Hijack()
+}
+
+// ReadFrom keeps http.ServeFile's sendfile path for images.
+func (w noCacheWriter) ReadFrom(r io.Reader) (int64, error) {
+	return io.Copy(w.ResponseWriter, r)
+}
+
+func (w noCacheWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
 }
 
 // requireRoot answers every request with a shutdown notice once the root
@@ -173,33 +223,15 @@ func (s *Server) setupRoutes() {
 
 // handleFavicon serves the markdown favicon
 func (s *Server) handleFavicon(w http.ResponseWriter, r *http.Request) {
-	// Try to find favicon.svg in template directory
-	exePath, err := os.Executable()
-	var faviconPath string
-	if err == nil {
-		exeDir := filepath.Dir(exePath)
-		faviconPath = filepath.Join(exeDir, "template", "favicon.svg")
-		if _, err := os.Stat(faviconPath); os.IsNotExist(err) {
-			// Try relative to current working directory
-			faviconPath = "template/favicon.svg"
-		}
-	} else {
-		faviconPath = "template/favicon.svg"
-	}
-
-	// Check if file exists
-	if _, err := os.Stat(faviconPath); os.IsNotExist(err) {
-		// Serve default markdown icon as SVG
-		w.Header().Set("Content-Type", "image/svg+xml")
-		w.Header().Set("Cache-Control", "public, max-age=86400")
-		w.Write([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="#000"/><text x="50" y="70" font-family="Arial, sans-serif" font-size="60" font-weight="bold" fill="#fff" text-anchor="middle">M</text></svg>`))
-		return
-	}
-
 	w.Header().Set("Content-Type", "image/svg+xml")
-	// Use shorter cache for initial requests to help Safari pick it up
-	w.Header().Set("Cache-Control", "public, max-age=3600")
-	http.ServeFile(w, r, faviconPath)
+	serveEmbedded(w, r, "favicon.svg", faviconSVG)
+}
+
+// serveCSS serves mdserver's stylesheet
+func (s *Server) serveCSS(w http.ResponseWriter, r *http.Request) {
+	log.Printf("file: style.css (embedded)")
+	w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	serveEmbedded(w, r, "style.css", styleCSS)
 }
 
 // handleRequest serves paths under the root: directory listings, rendered Markdown and images.
