@@ -5,7 +5,7 @@ priority: 3
 depends-on: [embed-mdserver-resources]
 parent:
 approved: "Scott Schlesier, 2026-10-11: inject the live reload script only when s.liveReload != nil. Cold read: not run"
-status: in-review
+status: done
 ---
 
 When live reload is on but the file watcher fails to set up, pages no longer carry the live
@@ -89,3 +89,5 @@ script itself.
 - 2026-10-11: Started on branch inject-live-reload-only-when-running
 - 2026-10-11: Assumption: the Start-failure test builds the watcher with NewLiveReload and points its rootDir at a missing directory, as Design suggests. Revert check: with `parseTemplates(config.EnableLiveReload)` restored, both new subtests fail on all three pages.
 - 2026-10-11: Review started
+- 2026-10-11: Review round 1: cold verify passed (4/4 criteria, 2/2 new tests fail on revert, 5 line mutants all killed, NewServer 100% covered). One finding fixed: the failure-path test now also asserts GET /livereload returns 404. Not re-run through pass 1 after that test-only commit. No open decisions or unproven risks, so pass 2 was skipped.
+- 2026-10-11: Done: Reviewed round 1: pages carry the live reload script only when s.liveReload != nil; both failure paths covered by TestLiveReloadScriptAbsentWhenSetupFails.
