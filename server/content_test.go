@@ -212,45 +212,24 @@ func TestServeMarkdownContent(t *testing.T) {
 
 		css := string(body)
 
-		// Verify CSS contains basic expected rules (works for both full CSS and default CSS)
 		expectedCSSRules := []string{
 			"body",
 			"code",
 			"pre",
+			".container",
+			"h1",
+			"h2",
+			".breadcrumbs",
 		}
-
 		for _, rule := range expectedCSSRules {
 			if !strings.Contains(css, rule) {
 				t.Errorf("CSS should contain rule for %s", rule)
 			}
 		}
 
-		// Check if this is the full CSS (from template/style.css) or default CSS
-		isDefaultCSS := strings.Contains(css, "Default CSS")
-		
-		if isDefaultCSS {
-			// For default CSS, verify it has basic styling
-			if !strings.Contains(css, "max-width") || !strings.Contains(css, "padding") {
-				t.Error("Default CSS should contain basic styling")
-			}
-		} else {
-			// For full CSS, verify advanced features
-			advancedRules := []string{
-				".container",
-				"h1",
-				"h2",
-				".breadcrumbs",
-			}
-			for _, rule := range advancedRules {
-				if !strings.Contains(css, rule) {
-					t.Errorf("Full CSS should contain rule for %s", rule)
-				}
-			}
-
-			// Verify CSS variables are present (for theming)
-			if !strings.Contains(css, ":root") || !strings.Contains(css, "--bg-color") {
-				t.Error("Full CSS should contain CSS variables for theming")
-			}
+		// Verify CSS variables are present (for theming)
+		if !strings.Contains(css, ":root") || !strings.Contains(css, "--bg-color") {
+			t.Error("CSS should contain CSS variables for theming")
 		}
 	})
 
