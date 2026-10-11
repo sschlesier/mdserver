@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"html"
+	"io"
 	"io/fs"
 	"log"
 	"net"
@@ -158,6 +159,11 @@ func (w noCacheWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return http.NewResponseController(w.ResponseWriter).Hijack()
 }
 
+// ReadFrom keeps http.ServeFile's sendfile path for images.
+func (w noCacheWriter) ReadFrom(r io.Reader) (int64, error) {
+	return io.Copy(w.ResponseWriter, r)
+}
+
 func (w noCacheWriter) Unwrap() http.ResponseWriter {
 	return w.ResponseWriter
 }
@@ -227,6 +233,7 @@ func (s *Server) handleFavicon(w http.ResponseWriter, r *http.Request) {
 
 // serveCSS serves mdserver's stylesheet
 func (s *Server) serveCSS(w http.ResponseWriter, r *http.Request) {
+	log.Printf("file: style.css (embedded)")
 	w.Header().Set("Content-Type", "text/css; charset=utf-8")
 	s.serveEmbedded(w, r, "style.css", styleCSS)
 }

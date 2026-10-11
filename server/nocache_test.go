@@ -101,3 +101,20 @@ func TestLiveReloadUpgradeIsNoCache(t *testing.T) {
 	defer conn.Close()
 	assertNoCache(t, "GET /livereload upgrade", resp.StatusCode, resp.Header)
 }
+
+// The wrapper keeps Flush working; the shutdown page flushes before the process exits.
+func TestNoCacheWriterFlushes(t *testing.T) {
+	h := noCache(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("bye"))
+		f, ok := w.(http.Flusher)
+		if !ok {
+			t.Fatal("wrapped writer isn't an http.Flusher")
+		}
+		f.Flush()
+	}))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/settings/shutdown", nil))
+	if !rec.Flushed {
+		t.Error("Flush didn't reach the underlying writer")
+	}
+}

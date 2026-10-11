@@ -75,7 +75,7 @@ func TestServesEmbeddedResourcesWithoutTemplateDir(t *testing.T) {
 	}
 	for _, dir := range []string{".", filepath.Dir(exe)} {
 		if _, err := os.Stat(filepath.Join(dir, "template")); err == nil {
-			t.Fatalf("%s has a template/ folder; the test needs it absent", dir)
+			t.Skipf("%s has a template/ folder (test binary built in the package dir?)", dir)
 		}
 	}
 
@@ -162,7 +162,7 @@ func TestIgnoresTemplateDirBesideBinary(t *testing.T) {
 	}
 	exeDir := filepath.Dir(exe)
 	if _, err := os.Stat(filepath.Join(exeDir, "template")); err == nil {
-		t.Fatalf("%s already has a template/ folder", exeDir)
+		t.Skipf("%s already has a template/ folder (test binary built in the package dir?)", exeDir)
 	}
 	t.Cleanup(func() { os.RemoveAll(filepath.Join(exeDir, "template")) })
 	if err := writeDecoys(exeDir); err != nil {
