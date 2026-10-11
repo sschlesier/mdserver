@@ -5,7 +5,7 @@ priority: 3
 depends-on: [move-mdserver-files-off-assets]
 parent:
 approved: "Scott Schlesier, 2026-10-11: embed under server/template, remove all fallbacks. Cold read: not run"
-status: in-progress
+status: in-review
 ---
 
 mdserver serves its stylesheet, page templates and favicon from files compiled into the binary,
@@ -77,3 +77,4 @@ template replacing a fallback.
 - 2026-10-11: Implemented. The stylesheet and favicon go through `http.ServeContent` with the process start time as the modification time, so `Last-Modified`, `Accept-Ranges` and conditional requests stay as `http.ServeFile` gave them (the Design allowed dropping them for the favicon; nothing is dropped). Removed `TestTemplateFilesLinkStylesheet`: it read `../template/` from disk, and the handler test above it now covers the embedded templates.
 - 2026-10-11: Revert check: both new tests fail against the pre-change code (fallback CSS and favicon served; working-directory decoys served). The page-template checks alone pass there, since the old inline page templates had the same markup.
 - 2026-10-11: Manual check: binary built into an empty directory and run with `--dir tickets --no-open`; every page, the stylesheet and the favicon are byte-identical to a `go run .` from the checkout, and the CSS matches `server/template/style.css`.
+- 2026-10-11: Review started
