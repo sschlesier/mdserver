@@ -26,6 +26,9 @@ var ErrRootMissing = errors.New("root directory no longer exists")
 // in-flight requests before closing their connections.
 var rootMissingShutdownTimeout = 2 * time.Second
 
+// newLiveReload creates the file watcher; tests replace it to simulate failure.
+var newLiveReload = NewLiveReload
+
 // Config holds server configuration
 type Config struct {
 	Host             string
@@ -55,7 +58,6 @@ type Server struct {
 func NewServer(config Config) *Server {
 	s := &Server{
 		config:       config,
-		templates:    parseTemplates(config.EnableLiveReload),
 		mux:          http.NewServeMux(),
 		rootGone:     make(chan struct{}),
 		shutdownDone: make(chan struct{}),
@@ -68,7 +70,7 @@ func NewServer(config Config) *Server {
 	// Initialize LiveReload if enabled
 	if config.EnableLiveReload {
 		var err error
-		s.liveReload, err = NewLiveReload(config.RootDir, config.Verbose)
+		s.liveReload, err = newLiveReload(config.RootDir, config.Verbose)
 		if err != nil {
 			log.Printf("Failed to initialize LiveReload: %v", err)
 		} else {
@@ -80,6 +82,7 @@ func NewServer(config Config) *Server {
 		}
 	}
 
+	s.templates = parseTemplates(s.liveReload != nil)
 	s.setupRoutes()
 	return s
 }
