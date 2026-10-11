@@ -94,15 +94,6 @@ func TestServesEmbeddedResourcesWithoutTemplateDir(t *testing.T) {
 	if ct := css.Header().Get("Content-Type"); ct != "text/css; charset=utf-8" {
 		t.Errorf("stylesheet Content-Type = %q", ct)
 	}
-	for header, want := range map[string]string{
-		"Cache-Control": "no-cache, no-store, must-revalidate",
-		"Pragma":        "no-cache",
-		"Expires":       "0",
-	} {
-		if got := css.Header().Get(header); got != want {
-			t.Errorf("stylesheet %s = %q, want %q", header, got, want)
-		}
-	}
 
 	for _, path := range []string{"/favicon.svg", "/favicon.ico"} {
 		fav := embedGet(t, h, path)
@@ -111,9 +102,6 @@ func TestServesEmbeddedResourcesWithoutTemplateDir(t *testing.T) {
 		}
 		if ct := fav.Header().Get("Content-Type"); ct != "image/svg+xml" {
 			t.Errorf("GET %s Content-Type = %q", path, ct)
-		}
-		if cc := fav.Header().Get("Cache-Control"); cc != "public, max-age=3600" {
-			t.Errorf("GET %s Cache-Control = %q", path, cc)
 		}
 	}
 }

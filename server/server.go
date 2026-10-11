@@ -63,7 +63,7 @@ func NewServer(config Config) *Server {
 	}
 	s.httpServer = &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", config.Host, config.Port),
-		Handler: s.requireRoot(s.mux),
+		Handler: noCache(s.requireRoot(s.mux)),
 	}
 
 	// Initialize LiveReload if enabled
@@ -118,6 +118,17 @@ func (s *Server) rootExists() bool {
 		return !errors.Is(err, fs.ErrNotExist)
 	}
 	return info.IsDir()
+}
+
+// noCache tells browsers not to cache any response, so a tab always shows the
+// current content.
+func noCache(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+		next.ServeHTTP(w, r)
+	})
 }
 
 // requireRoot answers every request with a shutdown notice once the root
@@ -180,17 +191,12 @@ func (s *Server) setupRoutes() {
 // handleFavicon serves the markdown favicon
 func (s *Server) handleFavicon(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "image/svg+xml")
-	// Use shorter cache for initial requests to help Safari pick it up
-	w.Header().Set("Cache-Control", "public, max-age=3600")
 	s.serveEmbedded(w, r, "favicon.svg", faviconSVG)
 }
 
 // serveCSS serves mdserver's stylesheet
 func (s *Server) serveCSS(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/css; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-	w.Header().Set("Pragma", "no-cache")
-	w.Header().Set("Expires", "0")
 	s.serveEmbedded(w, r, "style.css", styleCSS)
 }
 
