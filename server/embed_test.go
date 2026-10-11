@@ -35,22 +35,38 @@ func embedGet(t *testing.T, h http.Handler, path string) *httptest.ResponseRecor
 	return rec
 }
 
-// assertFullTemplate checks that every line of the embedded template that holds no
-// template action appears in body.
-func assertFullTemplate(t *testing.T, path, body, name string) {
+// readSourceFiles reads server/template/ from disk, independently of the embedded copies,
+// as the expected content. Call it before changing directory.
+func readSourceFiles(t *testing.T) map[string]string {
 	t.Helper()
-	for _, line := range strings.Split(string(mustReadTemplateFile(name)), "\n") {
+	files := map[string]string{}
+	for _, name := range []string{"page.html", "directory.html", "settings.html", "style.css", "favicon.svg"} {
+		b, err := os.ReadFile(filepath.Join("template", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		files[name] = string(b)
+	}
+	return files
+}
+
+// assertFullTemplate checks that every line of the source template that holds no template
+// action appears in body.
+func assertFullTemplate(t *testing.T, path, body, src string) {
+	t.Helper()
+	for _, line := range strings.Split(src, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.Contains(line, "{{") || strings.Contains(line, "}}") {
 			continue
 		}
 		if !strings.Contains(body, line) {
-			t.Errorf("GET %s is missing %s line %q", path, name, line)
+			t.Errorf("GET %s is missing template line %q", path, line)
 		}
 	}
 }
 
 func TestServesEmbeddedResourcesWithoutTemplateDir(t *testing.T) {
+	src := readSourceFiles(t)
 	t.Chdir(t.TempDir())
 	exe, err := os.Executable()
 	if err != nil {
@@ -65,25 +81,31 @@ func TestServesEmbeddedResourcesWithoutTemplateDir(t *testing.T) {
 	h := newEmbedTestServer(t)
 
 	// Visiting sub/ first makes it a removable watch, so settings renders every branch.
-	assertFullTemplate(t, "/sub/", embedGet(t, h, "/sub/").Body.String(), "directory.html")
-	assertFullTemplate(t, "/", embedGet(t, h, "/").Body.String(), "directory.html")
-	assertFullTemplate(t, "/sub/doc.md", embedGet(t, h, "/sub/doc.md").Body.String(), "page.html")
-	assertFullTemplate(t, "/settings", embedGet(t, h, "/settings").Body.String(), "settings.html")
+	assertFullTemplate(t, "/sub/", embedGet(t, h, "/sub/").Body.String(), src["directory.html"])
+	assertFullTemplate(t, "/", embedGet(t, h, "/").Body.String(), src["directory.html"])
+	assertFullTemplate(t, "/sub/doc.md", embedGet(t, h, "/sub/doc.md").Body.String(), src["page.html"])
+	assertFullTemplate(t, "/settings", embedGet(t, h, "/settings").Body.String(), src["settings.html"])
 
 	css := embedGet(t, h, "/_mdserver/style.css")
-	if css.Body.String() != string(styleCSS) {
+	if css.Body.String() != src["style.css"] {
 		t.Error("GET /_mdserver/style.css doesn't serve the embedded stylesheet")
 	}
 	if ct := css.Header().Get("Content-Type"); ct != "text/css; charset=utf-8" {
 		t.Errorf("stylesheet Content-Type = %q", ct)
 	}
-	if cc := css.Header().Get("Cache-Control"); cc != "no-cache, no-store, must-revalidate" {
-		t.Errorf("stylesheet Cache-Control = %q", cc)
+	for header, want := range map[string]string{
+		"Cache-Control": "no-cache, no-store, must-revalidate",
+		"Pragma":        "no-cache",
+		"Expires":       "0",
+	} {
+		if got := css.Header().Get(header); got != want {
+			t.Errorf("stylesheet %s = %q, want %q", header, got, want)
+		}
 	}
 
 	for _, path := range []string{"/favicon.svg", "/favicon.ico"} {
 		fav := embedGet(t, h, path)
-		if fav.Body.String() != string(faviconSVG) {
+		if fav.Body.String() != src["favicon.svg"] {
 			t.Errorf("GET %s doesn't serve the embedded favicon", path)
 		}
 		if ct := fav.Header().Get("Content-Type"); ct != "image/svg+xml" {
@@ -96,6 +118,7 @@ func TestServesEmbeddedResourcesWithoutTemplateDir(t *testing.T) {
 }
 
 func TestIgnoresTemplateDirInWorkingDirectory(t *testing.T) {
+	src := readSourceFiles(t)
 	wd := t.TempDir()
 	t.Chdir(wd)
 	decoy := "mdserver-decoy-template"
@@ -122,8 +145,26 @@ func TestIgnoresTemplateDirInWorkingDirectory(t *testing.T) {
 			t.Errorf("GET %s served the working directory's template/ file", path)
 		}
 	}
-	assertFullTemplate(t, "/sub/doc.md", embedGet(t, h, "/sub/doc.md").Body.String(), "page.html")
-	if body := embedGet(t, h, "/_mdserver/style.css").Body.String(); body != string(styleCSS) {
+	assertFullTemplate(t, "/sub/doc.md", embedGet(t, h, "/sub/doc.md").Body.String(), src["page.html"])
+	if body := embedGet(t, h, "/_mdserver/style.css").Body.String(); body != src["style.css"] {
 		t.Error("GET /_mdserver/style.css doesn't serve the embedded stylesheet")
+	}
+}
+
+// Pages carry the live reload client script only when live reload is on.
+func TestLiveReloadScriptFollowsConfig(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		root := t.TempDir()
+		if err := os.WriteFile(filepath.Join(root, "doc.md"), []byte("# Doc\n"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		srv := NewServer(Config{Host: "localhost", RootDir: root, EnableLiveReload: enabled})
+		t.Cleanup(srv.Stop)
+		for _, path := range []string{"/", "/doc.md", "/settings"} {
+			body := embedGet(t, srv.httpServer.Handler, path).Body.String()
+			if got := strings.Contains(body, "/livereload"); got != enabled {
+				t.Errorf("live reload %v: GET %s has the client script = %v", enabled, path, got)
+			}
+		}
 	}
 }
