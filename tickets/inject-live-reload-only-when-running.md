@@ -44,13 +44,13 @@ Actual: the page contains the script (`new WebSocket(... '/livereload')`), and
 
 ## Acceptance criteria
 
-- [ ] With `EnableLiveReload: true` and watcher creation (`NewLiveReload`) failing, a
+- [x] With `EnableLiveReload: true` and watcher creation (`NewLiveReload`) failing, a
       directory index, a Markdown page and `/settings` contain no live reload script.
-- [ ] The same holds when `LiveReload.Start` fails.
-- [ ] With live reload running, all three pages still contain the script, and with
+- [x] The same holds when `LiveReload.Start` fails.
+- [x] With live reload running, all three pages still contain the script, and with
       `EnableLiveReload: false` none do (existing `TestLiveReloadScriptFollowsConfig`
       keeps passing).
-- [ ] The new tests fail when the fix is reverted.
+- [x] The new tests fail when the fix is reverted.
 
 ## Verification
 
@@ -87,3 +87,4 @@ script itself.
 - 2026-10-11: Drafted from the review of embed-mdserver-resources (PR #15).
 - 2026-10-11: Approved: Scott Schlesier, 2026-10-11: inject the live reload script only when s.liveReload != nil. Cold read: not run
 - 2026-10-11: Started on branch inject-live-reload-only-when-running
+- 2026-10-11: Assumption: the Start-failure test builds the watcher with NewLiveReload and points its rootDir at a missing directory, as Design suggests. Revert check: with `parseTemplates(config.EnableLiveReload)` restored, both new subtests fail on all three pages.
