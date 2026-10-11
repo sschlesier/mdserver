@@ -9,10 +9,10 @@ import (
 	"time"
 )
 
-// templateFS holds mdserver's stylesheet, page templates and favicon. They are
-// never read from disk, so pages look the same wherever the binary runs.
+// mdserver's page templates, stylesheet and favicon are embedded and never read
+// from disk, so pages look the same wherever the binary runs.
 //
-//go:embed template
+//go:embed template/*.html
 var templateFS embed.FS
 
 var (
