@@ -118,11 +118,10 @@ func TestServesEmbeddedResourcesWithoutTemplateDir(t *testing.T) {
 	}
 }
 
-func TestIgnoresTemplateDirInWorkingDirectory(t *testing.T) {
-	src := readSourceFiles(t)
-	wd := t.TempDir()
-	t.Chdir(wd)
-	decoy := "mdserver-decoy-template"
+const decoy = "mdserver-decoy-template"
+
+// writeDecoys creates dir/template/ holding a decoy for every embedded file.
+func writeDecoys(dir string) error {
 	files := map[string]string{
 		"page.html":      "<html><body>" + decoy + "</body></html>",
 		"directory.html": "<html><body>" + decoy + "</body></html>",
@@ -130,26 +129,58 @@ func TestIgnoresTemplateDirInWorkingDirectory(t *testing.T) {
 		"style.css":      "/* " + decoy + " */",
 		"favicon.svg":    "<svg><!-- " + decoy + " --></svg>",
 	}
-	if err := os.Mkdir(filepath.Join(wd, "template"), 0755); err != nil {
-		t.Fatal(err)
+	if err := os.Mkdir(filepath.Join(dir, "template"), 0755); err != nil {
+		return err
 	}
 	for name, content := range files {
-		if err := os.WriteFile(filepath.Join(wd, "template", name), []byte(content), 0644); err != nil {
-			t.Fatal(err)
+		if err := os.WriteFile(filepath.Join(dir, "template", name), []byte(content), 0644); err != nil {
+			return err
 		}
 	}
+	return nil
+}
 
+// assertDecoysIgnored checks that no page, the stylesheet or the favicon serves a decoy.
+func assertDecoysIgnored(t *testing.T, src map[string]string, where string) {
+	t.Helper()
 	h := newEmbedTestServer(t)
-
-	for _, path := range []string{"/", "/sub/doc.md", "/settings", "/_mdserver/style.css", "/favicon.svg"} {
+	for _, path := range []string{"/", "/sub/doc.md", "/settings", "/_mdserver/style.css", "/favicon.svg", "/favicon.ico"} {
 		if body := embedGet(t, h, path).Body.String(); strings.Contains(body, decoy) {
-			t.Errorf("GET %s served the working directory's template/ file", path)
+			t.Errorf("GET %s served the template/ file %s", path, where)
 		}
 	}
 	assertFullTemplate(t, "/sub/doc.md", embedGet(t, h, "/sub/doc.md").Body.String(), src["page.html"])
 	if body := embedGet(t, h, "/_mdserver/style.css").Body.String(); body != src["style.css"] {
 		t.Error("GET /_mdserver/style.css doesn't serve the embedded stylesheet")
 	}
+}
+
+func TestIgnoresTemplateDirInWorkingDirectory(t *testing.T) {
+	src := readSourceFiles(t)
+	wd := t.TempDir()
+	t.Chdir(wd)
+	if err := writeDecoys(wd); err != nil {
+		t.Fatal(err)
+	}
+	assertDecoysIgnored(t, src, "in the working directory")
+}
+
+func TestIgnoresTemplateDirBesideBinary(t *testing.T) {
+	src := readSourceFiles(t)
+	t.Chdir(t.TempDir())
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	exeDir := filepath.Dir(exe)
+	if _, err := os.Stat(filepath.Join(exeDir, "template")); err == nil {
+		t.Fatalf("%s already has a template/ folder", exeDir)
+	}
+	t.Cleanup(func() { os.RemoveAll(filepath.Join(exeDir, "template")) })
+	if err := writeDecoys(exeDir); err != nil {
+		t.Skipf("can't write beside the test binary: %v", err)
+	}
+	assertDecoysIgnored(t, src, "beside the binary")
 }
 
 // Pages carry the live reload client script only when live reload is on.
@@ -183,10 +214,10 @@ func TestEmbeddedFilesUseBinaryModTime(t *testing.T) {
 	}
 	// Backdate the test binary so its mtime can't be mistaken for the server's start time.
 	old := time.Date(2001, 2, 3, 4, 5, 6, 0, time.UTC)
-	if err := os.Chtimes(exe, old, old); err != nil {
-		t.Fatal(err)
+	if err := os.Chtimes(exe, time.Time{}, old); err != nil {
+		t.Skipf("can't change the test binary's mtime: %v", err)
 	}
-	t.Cleanup(func() { os.Chtimes(exe, info.ModTime(), info.ModTime()) })
+	t.Cleanup(func() { os.Chtimes(exe, time.Time{}, info.ModTime()) })
 	want := old.Format(http.TimeFormat)
 
 	h := newEmbedTestServer(t)
