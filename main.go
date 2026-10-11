@@ -119,6 +119,7 @@ func main() {
 		File:             *file,
 		EnableLiveReload: *livereload,
 		Verbose:          *verbose,
+		Version:          version,
 	}
 
 	// Initialize and start server
