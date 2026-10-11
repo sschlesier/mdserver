@@ -221,6 +221,11 @@ func TestLiveReloadScriptAbsentWhenSetupFails(t *testing.T) {
 					t.Errorf("GET %s has the client script although live reload failed to start", path)
 				}
 			}
+			rec := httptest.NewRecorder()
+			srv.httpServer.Handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/livereload", nil))
+			if rec.Code != http.StatusNotFound {
+				t.Errorf("GET /livereload = %d, want 404", rec.Code)
+			}
 		})
 	}
 }
