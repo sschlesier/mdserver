@@ -42,6 +42,9 @@ Out of scope:
       CSS, default favicon), since the embedded files can't be missing. The "full or default
       CSS" branch in `server/content_test.go` goes with them: the test asserts the full CSS.
 - [x] `CHANGES.md` notes that on-disk `template/` files are no longer read.
+- [x] Every response, whatever its path or status, carries `Cache-Control: no-cache,
+      no-store, must-revalidate`, `Pragma: no-cache` and `Expires: 0`. (Added in review
+      round 2.)
 
 ## Verification
 
@@ -58,9 +61,11 @@ Out of scope:
   `scripts/`), so nothing there changes. Homebrew installs therefore render with the inline
   fallbacks today; after this change they get the full styling, which is the intended fix.
   Say so in `CHANGES.md`.
-- The embedded favicon is served from memory, keeping its `Content-Type: image/svg+xml` and
-  `Cache-Control: public, max-age=3600`. `Last-Modified`/range handling from `http.ServeFile`
+- The embedded favicon is served from memory, keeping its `Content-Type: image/svg+xml`.
+  Its `Cache-Control` follows the no-cache rule below (changed in review round 2). `Last-Modified`/range handling from `http.ServeFile`
   is not kept.
+- Nothing mdserver serves is cached: one wrapper around the handler sets the no-cache
+  headers on every response (added in review round 2).
 
 ## Boundaries
 
@@ -81,3 +86,4 @@ template replacing a fallback.
 - 2026-10-11: Decided by Scott Schlesier (review round 1): the stylesheet's and favicon's `Last-Modified` is the running binary's modification time ("use time from the binary"), replacing the process start time. Assumed: if `os.Executable` or its stat fails, fall back to the current time.
 - 2026-10-11: Triage round 1. Fixed: gofmt slip in `server/server.go`; CSS and favicon embedded as `[]byte`; tests compare against `server/template/` read from disk rather than the embedded variables; Pragma and Expires asserted; live reload script asserted present when on and absent when off; `Last-Modified` and 304 asserted. Dismissed: a decoy `template/` beside the executable (nothing in `server/` reads beside the executable; `os.Executable` is used only to stat the binary's mtime); the live reload script being injected when the watcher fails to start (predates this PR, and Boundaries forbid other HTML changes; worth its own spec); inlining `tmpl :=` (style only).
 - 2026-10-11: Triage round 2. Fixed: `templateFS` embeds only `template/*.html` (the stylesheet and favicon were stored twice); the decoy test also requests `/favicon.ico`; new `TestIgnoresTemplateDirBesideBinary` puts decoys beside the test binary (this reverses round 1's dismissal: the test is cheap, and a read beside the binary added back would otherwise pass); the mtime test skips where the test binary can't be modified, and leaves its access time alone. Dismissed as equivalent: dropping the explicit Content-Type on the stylesheet or favicon, or renaming the `ServeContent` name argument (`ServeContent` derives the same type from the extension, and the explicit header wins).
+- 2026-10-11: Spec change (review round 2), directed by Scott Schlesier: "everything this serves should be no cache, this is about up to date content and not for production purposes". Added criterion 6, and amended Design: the favicon drops `max-age=3600`; a `noCache` wrapper in `server/server.go` covers every response. This settles round 2's open decision (the stylesheet's no-store kept) and removes the favicon downgrade risk, since browsers store nothing. `Last-Modified` from the binary's mtime stays as decided in round 1, though with no-store it no longer affects browsers.
