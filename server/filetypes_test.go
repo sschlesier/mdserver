@@ -156,9 +156,23 @@ func TestStylesheetLivesOffAssets(t *testing.T) {
 	if rec := get("/assets/style.css"); rec.Code != http.StatusNotFound {
 		t.Errorf("GET /assets/style.css = %d, want 404 (a root .css isn't served)", rec.Code)
 	}
-	for _, path := range []string{"/assets/page.md", "/assets/", "/"} {
+	for _, path := range []string{"/assets/page.md", "/assets/", "/", "/settings"} {
 		if body := get(path).Body.String(); !strings.Contains(body, `href="/_mdserver/style.css"`) {
 			t.Errorf("GET %s doesn't link mdserver's stylesheet", path)
+		}
+	}
+}
+
+// The tests run from server/, so the pages above use the inline fallback templates; this
+// covers the template files that ship with the binary.
+func TestTemplateFilesLinkStylesheet(t *testing.T) {
+	for _, name := range []string{"page.html", "directory.html", "settings.html"} {
+		b, err := os.ReadFile(filepath.Join("..", "template", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(b), `href="/_mdserver/style.css"`) {
+			t.Errorf("template/%s doesn't link mdserver's stylesheet", name)
 		}
 	}
 }
