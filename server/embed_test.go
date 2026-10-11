@@ -168,3 +168,31 @@ func TestLiveReloadScriptFollowsConfig(t *testing.T) {
 		}
 	}
 }
+
+// The stylesheet and favicon carry the binary's modification time as Last-Modified, and
+// answer a matching If-Modified-Since with 304.
+func TestEmbeddedFilesUseBinaryModTime(t *testing.T) {
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(exe)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := info.ModTime().UTC().Format(http.TimeFormat)
+
+	h := newEmbedTestServer(t)
+	for _, path := range []string{"/_mdserver/style.css", "/favicon.svg"} {
+		if got := embedGet(t, h, path).Header().Get("Last-Modified"); got != want {
+			t.Errorf("GET %s Last-Modified = %q, want %q", path, got, want)
+		}
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("If-Modified-Since", want)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNotModified {
+			t.Errorf("GET %s with If-Modified-Since = %d, want 304", path, rec.Code)
+		}
+	}
+}

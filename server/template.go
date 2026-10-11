@@ -5,6 +5,7 @@ import (
 	"embed"
 	"html/template"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -21,10 +22,23 @@ var (
 	//go:embed template/favicon.svg
 	faviconSVG []byte
 
-	// embeddedModTime is the Last-Modified time for the embedded files. They can't
-	// change while the process runs, so its start time is the latest they could have.
-	embeddedModTime = time.Now()
+	// embeddedModTime is the Last-Modified time for the embedded files.
+	embeddedModTime = binaryModTime()
 )
+
+// binaryModTime returns the modification time of the running binary, which holds the
+// embedded files, or the current time if it can't be found.
+func binaryModTime() time.Time {
+	exe, err := os.Executable()
+	if err != nil {
+		return time.Now()
+	}
+	info, err := os.Stat(exe)
+	if err != nil {
+		return time.Now()
+	}
+	return info.ModTime()
+}
 
 // templates holds a server's parsed page templates.
 type templates struct {
