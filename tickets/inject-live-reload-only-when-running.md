@@ -5,7 +5,7 @@ priority: 3
 depends-on: [embed-mdserver-resources]
 parent:
 approved: "Scott Schlesier, 2026-10-11: inject the live reload script only when s.liveReload != nil. Cold read: not run"
-status: in-progress
+status: in-review
 ---
 
 When live reload is on but the file watcher fails to set up, pages no longer carry the live
@@ -88,3 +88,4 @@ script itself.
 - 2026-10-11: Approved: Scott Schlesier, 2026-10-11: inject the live reload script only when s.liveReload != nil. Cold read: not run
 - 2026-10-11: Started on branch inject-live-reload-only-when-running
 - 2026-10-11: Assumption: the Start-failure test builds the watcher with NewLiveReload and points its rootDir at a missing directory, as Design suggests. Revert check: with `parseTemplates(config.EnableLiveReload)` restored, both new subtests fail on all three pages.
+- 2026-10-11: Review started
