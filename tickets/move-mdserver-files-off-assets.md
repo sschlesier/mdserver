@@ -51,3 +51,4 @@ Out of scope:
 - 2026-10-11: Started on branch move-mdserver-files-off-assets
 - 2026-10-11: Implemented. The 410 page uses inline styles, so nothing to change there. Collision note (out of scope, not moved): `/settings`, `/livereload` and `/favicon.*` can still collide with root files of those names.
 - 2026-10-11: Review started
+- 2026-10-11: Review round 1 triage: fixed the untested settings page and template-file links (added tests). Dismissed: the shutdown page link mutant (handleShutdown calls os.Exit, so a test would kill the test process); no shared stylesheet-URL constant (refactor beyond spec); TestStylesheetLivesOffAssets overlapping the table test (it covers the folder-with-own-assets case the spec asks for); a root `_mdserver/` shadowed (accepted in Design).
