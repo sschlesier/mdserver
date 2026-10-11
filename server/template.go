@@ -15,8 +15,11 @@ import (
 var templateFS embed.FS
 
 var (
-	styleCSS   = mustReadTemplateFile("style.css")
-	faviconSVG = mustReadTemplateFile("favicon.svg")
+	//go:embed template/style.css
+	styleCSS []byte
+
+	//go:embed template/favicon.svg
+	faviconSVG []byte
 
 	// embeddedModTime is the Last-Modified time for the embedded files. They can't
 	// change while the process runs, so its start time is the latest they could have.
