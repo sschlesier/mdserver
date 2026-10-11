@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -185,6 +186,47 @@ func TestLiveReloadScriptFollowsConfig(t *testing.T) {
 				t.Errorf("live reload %v: GET %s has the client script = %v", enabled, path, got)
 			}
 		}
+	}
+}
+
+// When the watcher can't be set up, there is no /livereload endpoint, so no page carries the client script.
+func TestLiveReloadScriptAbsentWhenSetupFails(t *testing.T) {
+	failures := map[string]func(rootDir string, verbose bool) (*LiveReload, error){
+		"create": func(string, bool) (*LiveReload, error) {
+			return nil, errors.New("no watcher")
+		},
+		"start": func(rootDir string, verbose bool) (*LiveReload, error) {
+			lr, err := NewLiveReload(rootDir, verbose)
+			if lr != nil {
+				lr.rootDir = filepath.Join(rootDir, "missing")
+			}
+			return lr, err
+		},
+	}
+	for name, fail := range failures {
+		t.Run(name, func(t *testing.T) {
+			orig := newLiveReload
+			newLiveReload = fail
+			t.Cleanup(func() { newLiveReload = orig })
+
+			root := t.TempDir()
+			if err := os.WriteFile(filepath.Join(root, "doc.md"), []byte("# Doc\n"), 0644); err != nil {
+				t.Fatal(err)
+			}
+			srv := NewServer(Config{Host: "localhost", RootDir: root, EnableLiveReload: true})
+			t.Cleanup(srv.Stop)
+			for _, path := range []string{"/", "/doc.md", "/settings"} {
+				body := embedGet(t, srv.httpServer.Handler, path).Body.String()
+				if strings.Contains(body, "/livereload") {
+					t.Errorf("GET %s has the client script although live reload failed to start", path)
+				}
+			}
+			rec := httptest.NewRecorder()
+			srv.httpServer.Handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/livereload", nil))
+			if rec.Code != http.StatusNotFound {
+				t.Errorf("GET /livereload = %d, want 404", rec.Code)
+			}
+		})
 	}
 }
 
