@@ -243,7 +243,9 @@ hr {
 
 .version {
 	margin-left: auto;
-	font-size: 0.75em;
+	align-self: flex-end;
+	padding-bottom: 4px;
+	font-size: 0.65em;
 	opacity: 0.5;
 	color: var(--text-color);
 	flex-shrink: 0;
