@@ -181,14 +181,14 @@ func TestServeMarkdownContent(t *testing.T) {
 		html := string(body)
 
 		// Verify CSS link is present
-		if !strings.Contains(html, `<link rel="stylesheet" href="/assets/style.css">`) {
+		if !strings.Contains(html, `<link rel="stylesheet" href="/_mdserver/style.css">`) {
 			t.Error("HTML should contain link to stylesheet")
 		}
 	})
 
 	// Test 3: Verify CSS file is served and contains expected styles
 	t.Run("CSS file is served", func(t *testing.T) {
-		resp, err := http.Get(baseURL + "/assets/style.css")
+		resp, err := http.Get(baseURL + "/_mdserver/style.css")
 		if err != nil {
 			t.Fatalf("Failed to fetch CSS file: %v", err)
 		}
@@ -453,7 +453,7 @@ func TestServeDirectoryIndex(t *testing.T) {
 	}
 
 	// Verify CSS is linked
-	if !strings.Contains(html, `<link rel="stylesheet" href="/assets/style.css">`) {
+	if !strings.Contains(html, `<link rel="stylesheet" href="/_mdserver/style.css">`) {
 		t.Error("Directory listing should include CSS link")
 	}
 }

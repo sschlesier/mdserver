@@ -357,7 +357,7 @@ func (s *Server) getDefaultTemplate() (*template.Template, error) {
 	<link rel="icon" type="image/svg+xml" href="/favicon.ico">
 	<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 	<link rel="apple-touch-icon" href="/favicon.ico">
-	<link rel="stylesheet" href="/assets/style.css">
+	<link rel="stylesheet" href="/_mdserver/style.css">
 	<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 </head>
 <body>
@@ -398,7 +398,7 @@ func (s *Server) getDefaultDirectoryTemplate() (*template.Template, error) {
 	<link rel="icon" type="image/svg+xml" href="/favicon.ico">
 	<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 	<link rel="apple-touch-icon" href="/favicon.ico">
-	<link rel="stylesheet" href="/assets/style.css">
+	<link rel="stylesheet" href="/_mdserver/style.css">
 </head>
 <body>
 	<div class="container">
@@ -503,7 +503,7 @@ func (s *Server) handleShutdown(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(`<!DOCTYPE html><html><head><title>Shutting Down</title><link rel="stylesheet" href="/assets/style.css"></head><body><div class="container"><h1>Server shutting down...</h1><p>You can close this tab.</p></div></body></html>`))
+	w.Write([]byte(`<!DOCTYPE html><html><head><title>Shutting Down</title><link rel="stylesheet" href="/_mdserver/style.css"></head><body><div class="container"><h1>Server shutting down...</h1><p>You can close this tab.</p></div></body></html>`))
 	if f, ok := w.(http.Flusher); ok {
 		f.Flush()
 	}
@@ -581,7 +581,7 @@ func (s *Server) getDefaultSettingsTemplate() (*template.Template, error) {
 	<link rel="icon" type="image/svg+xml" href="/favicon.ico">
 	<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 	<link rel="apple-touch-icon" href="/favicon.ico">
-	<link rel="stylesheet" href="/assets/style.css">
+	<link rel="stylesheet" href="/_mdserver/style.css">
 </head>
 <body>
 	<div class="container">

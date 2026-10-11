@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Breaking:** `/assets/<path>` now serves `<root>/assets/<path>`, so relative links into a folder's own `assets/` directory work. It used to serve `<root>/<path>`. `/assets/style.css` is still mdserver's stylesheet
+- **Breaking:** `/assets/<path>` now serves `<root>/assets/<path>`, so relative links into a folder's own `assets/` directory work. It used to serve `<root>/<path>`. mdserver's own stylesheet moves to `/_mdserver/style.css`, so a folder's `assets/style.css` is no longer shadowed
 - Serve only Markdown (rendered) and images (`.png .jpg .jpeg .gif .svg .webp`) from the served directory; any other file, such as `.html`, `.js`, `.json` or `.txt`, gets 404
 - Render `.md` files in any case (`.MD`, `.Md`)
 - Serve images with `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; form-action 'none'` and `X-Content-Type-Options: nosniff`, so scripts and forms in an SVG opened directly don't run

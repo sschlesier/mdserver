@@ -14,30 +14,31 @@ const wantImageCSP = "default-src 'none'; style-src 'unsafe-inline'; img-src dat
 func TestOnlyMarkdownAndImagesAreServed(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
-		"a.md":            "# a",
-		"upper.MD":        "# upper",
-		"mixed.Md":        "# mixed",
-		"img.png":         "png",
-		"IMG.PNG":         "png",
-		"photo.jpg":       "jpg",
-		"photo.jpeg":      "jpeg",
-		"anim.gif":        "gif",
-		"draw.svg":        `<svg xmlns="http://www.w3.org/2000/svg"/>`,
-		"pic.webp":        "webp",
-		"only-root.png":   "png",
-		"x.html":          "<p>x</p>",
-		"x.htm":           "<p>x</p>",
-		"x.css":           "body{}",
-		"x.js":            "alert(1)",
-		"data.json":       "{}",
-		"notes.txt":       "notes",
-		"doc.pdf":         "pdf",
-		"main.go":         "package main",
-		"icon.ico":        "ico",
-		"Makefile":        "all:",
-		"assets/logo.png": "png",
-		"assets/page.md":  "# page",
-		"assets/x.js":     "alert(1)",
+		"a.md":             "# a",
+		"upper.MD":         "# upper",
+		"mixed.Md":         "# mixed",
+		"img.png":          "png",
+		"IMG.PNG":          "png",
+		"photo.jpg":        "jpg",
+		"photo.jpeg":       "jpeg",
+		"anim.gif":         "gif",
+		"draw.svg":         `<svg xmlns="http://www.w3.org/2000/svg"/>`,
+		"pic.webp":         "webp",
+		"only-root.png":    "png",
+		"x.html":           "<p>x</p>",
+		"x.htm":            "<p>x</p>",
+		"x.css":            "body{}",
+		"x.js":             "alert(1)",
+		"data.json":        "{}",
+		"notes.txt":        "notes",
+		"doc.pdf":          "pdf",
+		"main.go":          "package main",
+		"icon.ico":         "ico",
+		"Makefile":         "all:",
+		"assets/logo.png":  "png",
+		"assets/page.md":   "# page",
+		"assets/x.js":      "alert(1)",
+		"assets/style.css": "body{}",
 	}
 	for name, content := range files {
 		p := filepath.Join(root, name)
@@ -90,13 +91,13 @@ func TestOnlyMarkdownAndImagesAreServed(t *testing.T) {
 		{"/assets/page", http.StatusOK, "text/html", false},
 		{"/assets/x.js", http.StatusNotFound, "", false},
 		{"/assets/only-root.png", http.StatusNotFound, "", false},
+		{"/assets/style.css", http.StatusNotFound, "", false}, // a root .css follows the allowlist
 		{"/assets/", http.StatusOK, "text/html", false},
 
 		// mdserver's own files and pages
 		{"/", http.StatusOK, "text/html", false},
-		{"/assets/style.css", http.StatusOK, "text/css", false},
-		{"/assets/sub/style.css", http.StatusNotFound, "", false},
-		{"/assets/x-style.css", http.StatusNotFound, "", false},
+		{"/_mdserver/style.css", http.StatusOK, "text/css", false},
+		{"/_mdserver/other.css", http.StatusNotFound, "", false},
 		{"/favicon.svg", http.StatusOK, "image/svg+xml", false},
 		{"/favicon.ico", http.StatusOK, "image/svg+xml", false},
 	}
@@ -124,6 +125,55 @@ func TestOnlyMarkdownAndImagesAreServed(t *testing.T) {
 				t.Errorf("GET %s has image headers (CSP %q, X-Content-Type-Options %q), want none", tt.path, csp, nosniff)
 			}
 		})
+	}
+}
+
+func TestStylesheetLivesOffAssets(t *testing.T) {
+	root := t.TempDir()
+	for name, content := range map[string]string{
+		"assets/logo.png":  "png",
+		"assets/style.css": "body{}",
+		"assets/page.md":   "# page",
+	} {
+		p := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	h := NewServer(Config{Host: "localhost", RootDir: root}).httpServer.Handler
+	get := func(path string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		return rec
+	}
+
+	if rec := get("/assets/logo.png"); rec.Code != http.StatusOK || rec.Body.String() != "png" {
+		t.Errorf("GET /assets/logo.png = %d %q, want the folder's file", rec.Code, rec.Body.String())
+	}
+	if rec := get("/assets/style.css"); rec.Code != http.StatusNotFound {
+		t.Errorf("GET /assets/style.css = %d, want 404 (a root .css isn't served)", rec.Code)
+	}
+	for _, path := range []string{"/assets/page.md", "/assets/", "/", "/settings"} {
+		if body := get(path).Body.String(); !strings.Contains(body, `href="/_mdserver/style.css"`) {
+			t.Errorf("GET %s doesn't link mdserver's stylesheet", path)
+		}
+	}
+}
+
+// The tests run from server/, so the pages above use the inline fallback templates; this
+// covers the template files that ship with the binary.
+func TestTemplateFilesLinkStylesheet(t *testing.T) {
+	for _, name := range []string{"page.html", "directory.html", "settings.html"} {
+		b, err := os.ReadFile(filepath.Join("..", "template", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(b), `href="/_mdserver/style.css"`) {
+			t.Errorf("template/%s doesn't link mdserver's stylesheet", name)
+		}
 	}
 }
 
