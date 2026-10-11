@@ -41,7 +41,7 @@ type Server struct {
 	httpServer *http.Server
 	templates  templates
 
-	rootGone    chan struct{}
+	rootGone     chan struct{}
 	rootGoneOnce sync.Once
 	shutdownDone chan struct{}
 
