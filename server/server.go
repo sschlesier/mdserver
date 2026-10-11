@@ -1,12 +1,14 @@
 package server
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"html"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -124,11 +126,40 @@ func (s *Server) rootExists() bool {
 // current content.
 func noCache(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		w.Header().Set("Pragma", "no-cache")
-		w.Header().Set("Expires", "0")
-		next.ServeHTTP(w, r)
+		setNoCache(w.Header())
+		next.ServeHTTP(noCacheWriter{w}, r)
 	})
+}
+
+func setNoCache(h http.Header) {
+	h.Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	h.Set("Pragma", "no-cache")
+	h.Set("Expires", "0")
+}
+
+// noCacheWriter sets the no-cache headers again as the status is written:
+// http.ServeContent and http.ServeFile delete Cache-Control before writing an
+// error such as 416.
+type noCacheWriter struct {
+	http.ResponseWriter
+}
+
+func (w noCacheWriter) WriteHeader(code int) {
+	setNoCache(w.Header())
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w noCacheWriter) Flush() {
+	http.NewResponseController(w.ResponseWriter).Flush()
+}
+
+// Hijack lets the live reload WebSocket take over the connection.
+func (w noCacheWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return http.NewResponseController(w.ResponseWriter).Hijack()
+}
+
+func (w noCacheWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
 }
 
 // requireRoot answers every request with a shutdown notice once the root
