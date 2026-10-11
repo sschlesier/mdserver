@@ -16,9 +16,6 @@ import (
 	"mdserver/renderer"
 )
 
-// settingsGearIcon is the SVG markup for the settings gear icon used in breadcrumbs.
-const settingsGearIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`
-
 // Breadcrumb represents a single breadcrumb navigation item
 type Breadcrumb struct {
 	Href string
@@ -61,12 +58,7 @@ func (s *Server) handleMarkdown(w http.ResponseWriter, r *http.Request, filePath
 	// Generate breadcrumbs
 	breadcrumbs := createBreadcrumbs(relPath)
 
-	// Load and execute template
-	tmpl, err := s.loadTemplate()
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to load template: %v", err), http.StatusInternalServerError)
-		return
-	}
+	tmpl := s.templates.page
 
 	data := struct {
 		Title       string
@@ -205,12 +197,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, dirPath str
 		}
 	}
 
-	// Load directory template
-	tmpl, err := s.loadDirectoryTemplate()
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to load template: %v", err), http.StatusInternalServerError)
-		return
-	}
+	tmpl := s.templates.directory
 
 	// Determine title
 	title := "Index"
@@ -234,199 +221,6 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, dirPath str
 		http.Error(w, "Failed to render template", http.StatusInternalServerError)
 		return
 	}
-}
-
-// serveCSS serves the CSS file from template directory
-func (s *Server) serveCSS(w http.ResponseWriter, r *http.Request) {
-	// Try to find template directory relative to executable or current directory
-	exePath, err := os.Executable()
-	var cssPath string
-	if err == nil {
-		exeDir := filepath.Dir(exePath)
-		cssPath = filepath.Join(exeDir, "template", "style.css")
-		if _, err := os.Stat(cssPath); os.IsNotExist(err) {
-			// Try relative to current working directory
-			cssPath = "template/style.css"
-		}
-	} else {
-		cssPath = "template/style.css"
-	}
-
-	// Check if file exists
-	if _, err := os.Stat(cssPath); os.IsNotExist(err) {
-		// Serve default CSS inline
-		log.Printf("file: %s (default CSS)", cssPath)
-		w.Header().Set("Content-Type", "text/css; charset=utf-8")
-		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		w.Header().Set("Pragma", "no-cache")
-		w.Header().Set("Expires", "0")
-		w.Write([]byte(getDefaultCSS()))
-		return
-	}
-
-	log.Printf("file: %s", cssPath)
-	w.Header().Set("Content-Type", "text/css; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-	w.Header().Set("Pragma", "no-cache")
-	w.Header().Set("Expires", "0")
-	http.ServeFile(w, r, cssPath)
-}
-
-// loadTemplate loads the HTML template
-func (s *Server) loadTemplate() (*template.Template, error) {
-	// Try to find template directory relative to executable or current directory
-	exePath, err := os.Executable()
-	var templatePath string
-	if err == nil {
-		exeDir := filepath.Dir(exePath)
-		templatePath = filepath.Join(exeDir, "template", "page.html")
-		if _, err := os.Stat(templatePath); os.IsNotExist(err) {
-			// Try relative to current working directory
-			templatePath = "template/page.html"
-		}
-	} else {
-		templatePath = "template/page.html"
-	}
-
-	// Try to load template file
-	tmplContent, err := os.ReadFile(templatePath)
-	if err != nil {
-		// Use default template
-		return s.getDefaultTemplate()
-	}
-
-	tmplContentStr := string(tmplContent)
-	// Inject LiveReload script if enabled
-	if s.config.EnableLiveReload {
-		tmplContentStr = s.injectLiveReloadScript(tmplContentStr)
-	}
-
-	tmpl, parseErr := template.New("page").Parse(tmplContentStr)
-	if parseErr != nil {
-		return nil, parseErr
-	}
-
-	return tmpl, nil
-}
-
-// loadDirectoryTemplate loads the directory listing template
-func (s *Server) loadDirectoryTemplate() (*template.Template, error) {
-	// Try to find template directory relative to executable or current directory
-	exePath, err := os.Executable()
-	var templatePath string
-	if err == nil {
-		exeDir := filepath.Dir(exePath)
-		templatePath = filepath.Join(exeDir, "template", "directory.html")
-		if _, err := os.Stat(templatePath); os.IsNotExist(err) {
-			// Try relative to current working directory
-			templatePath = "template/directory.html"
-		}
-	} else {
-		templatePath = "template/directory.html"
-	}
-
-	// Try to load template file
-	tmplContent, err := os.ReadFile(templatePath)
-	if err != nil {
-		// Use default directory template
-		return s.getDefaultDirectoryTemplate()
-	}
-
-	tmplContentStr := string(tmplContent)
-	// Inject LiveReload script if enabled
-	if s.config.EnableLiveReload {
-		tmplContentStr = s.injectLiveReloadScript(tmplContentStr)
-	}
-
-	tmpl, parseErr := template.New("directory").Parse(tmplContentStr)
-	if parseErr != nil {
-		return nil, parseErr
-	}
-
-	return tmpl, nil
-}
-
-// getDefaultTemplate returns a default HTML template
-func (s *Server) getDefaultTemplate() (*template.Template, error) {
-	tmpl := `<!DOCTYPE html>
-<html lang="en">
-<head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>{{.Title}}</title>
-	<link rel="icon" type="image/svg+xml" href="/favicon.ico">
-	<link rel="icon" type="image/svg+xml" href="/favicon.svg">
-	<link rel="apple-touch-icon" href="/favicon.ico">
-	<link rel="stylesheet" href="/_mdserver/style.css">
-	<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-</head>
-<body>
-	<div class="container">
-		{{if .Breadcrumbs}}
-		<nav class="breadcrumbs">
-			<span class="breadcrumb-links">
-				{{range $index, $crumb := .Breadcrumbs}}{{if $index}}    {{end}}<a href="{{$crumb.Href}}">{{$crumb.Text}}</a>{{end}}
-			</span>
-			<a href="/settings" class="settings-icon" title="Settings">` + settingsGearIcon + `</a>
-		</nav>
-		{{end}}
-		{{.Content}}
-	</div>
-	<script>
-		mermaid.initialize({ startOnLoad: true, theme: 'default' });
-	</script>
-</body>
-</html>`
-
-	tmplStr := tmpl
-	// Inject LiveReload script if enabled
-	if s.config.EnableLiveReload {
-		tmplStr = s.injectLiveReloadScript(tmplStr)
-	}
-
-	return template.New("page").Parse(tmplStr)
-}
-
-// getDefaultDirectoryTemplate returns a default directory listing template
-func (s *Server) getDefaultDirectoryTemplate() (*template.Template, error) {
-	tmpl := `<!DOCTYPE html>
-<html lang="en">
-<head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>{{.Title}}</title>
-	<link rel="icon" type="image/svg+xml" href="/favicon.ico">
-	<link rel="icon" type="image/svg+xml" href="/favicon.svg">
-	<link rel="apple-touch-icon" href="/favicon.ico">
-	<link rel="stylesheet" href="/_mdserver/style.css">
-</head>
-<body>
-	<div class="container">
-		<nav class="breadcrumbs">
-			<span class="breadcrumb-links">
-				{{range $index, $crumb := .Breadcrumbs}}{{if $index}}    {{end}}<a href="{{$crumb.Href}}">{{$crumb.Text}}</a>{{end}}
-			</span>
-			<a href="/settings" class="settings-icon" title="Settings">` + settingsGearIcon + `</a>
-		</nav>
-		<h1>{{.Title}}</h1>
-		<ul class="directory-listing">
-			{{range .Entries}}
-			<li class="{{if .IsDir}}directory{{else if .IsMarkdown}}markdown{{else}}file{{end}}">
-				<a href="{{.Path}}">{{.Name}}{{if .IsDir}}/{{end}}</a>
-			</li>
-			{{end}}
-		</ul>
-	</div>
-</body>
-</html>`
-
-	tmplStr := tmpl
-	// Inject LiveReload script if enabled
-	if s.config.EnableLiveReload {
-		tmplStr = s.injectLiveReloadScript(tmplStr)
-	}
-
-	return template.New("directory").Parse(tmplStr)
 }
 
 // WatchedDir represents a watched directory for the settings page.
@@ -471,11 +265,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	tmpl, err := s.loadSettingsTemplate()
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to load template: %v", err), http.StatusInternalServerError)
-		return
-	}
+	tmpl := s.templates.settings
 
 	data := struct {
 		Title              string
@@ -541,90 +331,6 @@ func (s *Server) handleRemoveWatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, "/settings", http.StatusSeeOther)
-}
-
-// loadSettingsTemplate loads the settings page template.
-func (s *Server) loadSettingsTemplate() (*template.Template, error) {
-	exePath, err := os.Executable()
-	var templatePath string
-	if err == nil {
-		exeDir := filepath.Dir(exePath)
-		templatePath = filepath.Join(exeDir, "template", "settings.html")
-		if _, err := os.Stat(templatePath); os.IsNotExist(err) {
-			templatePath = "template/settings.html"
-		}
-	} else {
-		templatePath = "template/settings.html"
-	}
-
-	tmplContent, err := os.ReadFile(templatePath)
-	if err != nil {
-		return s.getDefaultSettingsTemplate()
-	}
-
-	tmplContentStr := string(tmplContent)
-	if s.config.EnableLiveReload {
-		tmplContentStr = s.injectLiveReloadScript(tmplContentStr)
-	}
-
-	return template.New("settings").Parse(tmplContentStr)
-}
-
-// getDefaultSettingsTemplate returns a default settings page template.
-func (s *Server) getDefaultSettingsTemplate() (*template.Template, error) {
-	tmpl := `<!DOCTYPE html>
-<html lang="en">
-<head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>{{.Title}}</title>
-	<link rel="icon" type="image/svg+xml" href="/favicon.ico">
-	<link rel="icon" type="image/svg+xml" href="/favicon.svg">
-	<link rel="apple-touch-icon" href="/favicon.ico">
-	<link rel="stylesheet" href="/_mdserver/style.css">
-</head>
-<body>
-	<div class="container">
-		<nav class="breadcrumbs">
-			<span class="breadcrumb-links">
-				{{range $index, $crumb := .Breadcrumbs}}{{if $index}}    {{end}}<a href="{{$crumb.Href}}">{{$crumb.Text}}</a>{{end}}
-			</span>
-		</nav>
-		<h1>Settings</h1>
-		<div class="settings-section">
-			<h2>Server</h2>
-			<form method="POST" action="/settings/shutdown" onsubmit="return confirm('Are you sure you want to shut down the server?');">
-				<button type="submit" class="shutdown-btn">` + `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>` + ` Shut Down Server</button>
-			</form>
-		</div>
-		{{if .LiveReloadEnabled}}
-		<div class="settings-section">
-			<h2>Watched Directories</h2>
-			<div class="watched-dirs-list">
-				{{range .WatchedDirs}}
-				<div class="watched-dir-row">
-					<span class="watched-dir-path">{{.Display}}</span>
-					{{if .IsRoot}}<span class="root-badge">root</span>{{else}}
-					<form method="POST" action="/settings/remove-watch" style="display:inline;">
-						<input type="hidden" name="dir" value="{{.Path}}">
-						<button type="submit" class="remove-watch-btn">Remove</button>
-					</form>
-					{{end}}
-				</div>
-				{{end}}
-			</div>
-		</div>
-		{{end}}
-	</div>
-</body>
-</html>`
-
-	tmplStr := tmpl
-	if s.config.EnableLiveReload {
-		tmplStr = s.injectLiveReloadScript(tmplStr)
-	}
-
-	return template.New("settings").Parse(tmplStr)
 }
 
 // extractTitle extracts title from markdown content or uses filename
@@ -725,7 +431,7 @@ func createBreadcrumbs(relPath string) []Breadcrumb {
 }
 
 // injectLiveReloadScript injects the LiveReload client script into HTML templates
-func (s *Server) injectLiveReloadScript(html string) string {
+func injectLiveReloadScript(html string) string {
 	script := `<script>
 (function() {
 	function connect() {
@@ -759,15 +465,4 @@ func (s *Server) injectLiveReloadScript(html string) string {
 	}
 	// If no </body> tag, append at the end
 	return html + script
-}
-
-// getDefaultCSS returns default CSS content
-func getDefaultCSS() string {
-	return `/* Default CSS - template/style.css not found */
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; line-height: 1.6; }
-code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; }
-pre { background: #f5f5f5; padding: 16px; border-radius: 5px; overflow-x: auto; }
-table { border-collapse: collapse; width: 100%; }
-th, td { border: 1px solid #ddd; padding: 8px 12px; }
-th { background: #f8f8f8; }`
 }

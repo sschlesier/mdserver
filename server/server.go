@@ -39,8 +39,9 @@ type Server struct {
 	mux        *http.ServeMux
 	liveReload *LiveReload
 	httpServer *http.Server
+	templates  templates
 
-	rootGone     chan struct{}
+	rootGone    chan struct{}
 	rootGoneOnce sync.Once
 	shutdownDone chan struct{}
 
@@ -51,6 +52,7 @@ type Server struct {
 func NewServer(config Config) *Server {
 	s := &Server{
 		config:       config,
+		templates:    parseTemplates(config.EnableLiveReload),
 		mux:          http.NewServeMux(),
 		rootGone:     make(chan struct{}),
 		shutdownDone: make(chan struct{}),
@@ -173,33 +175,19 @@ func (s *Server) setupRoutes() {
 
 // handleFavicon serves the markdown favicon
 func (s *Server) handleFavicon(w http.ResponseWriter, r *http.Request) {
-	// Try to find favicon.svg in template directory
-	exePath, err := os.Executable()
-	var faviconPath string
-	if err == nil {
-		exeDir := filepath.Dir(exePath)
-		faviconPath = filepath.Join(exeDir, "template", "favicon.svg")
-		if _, err := os.Stat(faviconPath); os.IsNotExist(err) {
-			// Try relative to current working directory
-			faviconPath = "template/favicon.svg"
-		}
-	} else {
-		faviconPath = "template/favicon.svg"
-	}
-
-	// Check if file exists
-	if _, err := os.Stat(faviconPath); os.IsNotExist(err) {
-		// Serve default markdown icon as SVG
-		w.Header().Set("Content-Type", "image/svg+xml")
-		w.Header().Set("Cache-Control", "public, max-age=86400")
-		w.Write([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="#000"/><text x="50" y="70" font-family="Arial, sans-serif" font-size="60" font-weight="bold" fill="#fff" text-anchor="middle">M</text></svg>`))
-		return
-	}
-
 	w.Header().Set("Content-Type", "image/svg+xml")
 	// Use shorter cache for initial requests to help Safari pick it up
 	w.Header().Set("Cache-Control", "public, max-age=3600")
-	http.ServeFile(w, r, faviconPath)
+	serveEmbedded(w, r, "favicon.svg", faviconSVG)
+}
+
+// serveCSS serves mdserver's stylesheet
+func (s *Server) serveCSS(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+	serveEmbedded(w, r, "style.css", styleCSS)
 }
 
 // handleRequest serves paths under the root: directory listings, rendered Markdown and images.

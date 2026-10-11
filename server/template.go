@@ -1,0 +1,62 @@
+package server
+
+import (
+	"bytes"
+	"embed"
+	"html/template"
+	"net/http"
+	"time"
+)
+
+// templateFS holds mdserver's stylesheet, page templates and favicon. They are
+// never read from disk, so pages look the same wherever the binary runs.
+//
+//go:embed template
+var templateFS embed.FS
+
+var (
+	styleCSS   = mustReadTemplateFile("style.css")
+	faviconSVG = mustReadTemplateFile("favicon.svg")
+
+	// embeddedModTime is the Last-Modified time for the embedded files. They can't
+	// change while the process runs, so its start time is the latest they could have.
+	embeddedModTime = time.Now()
+)
+
+// templates holds a server's parsed page templates.
+type templates struct {
+	page      *template.Template
+	directory *template.Template
+	settings  *template.Template
+}
+
+// parseTemplates parses the embedded page templates, adding the live reload
+// client script when liveReload is set.
+func parseTemplates(liveReload bool) templates {
+	parse := func(name string) *template.Template {
+		src := string(mustReadTemplateFile(name + ".html"))
+		if liveReload {
+			src = injectLiveReloadScript(src)
+		}
+		return template.Must(template.New(name).Parse(src))
+	}
+	return templates{
+		page:      parse("page"),
+		directory: parse("directory"),
+		settings:  parse("settings"),
+	}
+}
+
+// serveEmbedded writes an embedded file, answering conditional and range
+// requests as http.ServeFile would.
+func serveEmbedded(w http.ResponseWriter, r *http.Request, name string, content []byte) {
+	http.ServeContent(w, r, name, embeddedModTime, bytes.NewReader(content))
+}
+
+func mustReadTemplateFile(name string) []byte {
+	b, err := templateFS.ReadFile("template/" + name)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
