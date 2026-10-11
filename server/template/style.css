@@ -241,6 +241,18 @@ hr {
 	margin-left: auto;
 }
 
+.version {
+	margin-left: auto;
+	font-size: 0.75em;
+	opacity: 0.5;
+	color: var(--text-color);
+	flex-shrink: 0;
+}
+
+.version + .settings-icon {
+	margin-left: 0.25em;
+}
+
 .settings-icon:hover {
 	opacity: 1;
 	color: var(--link-color);

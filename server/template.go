@@ -30,14 +30,15 @@ type templates struct {
 }
 
 // parseTemplates parses the embedded page templates, adding the live reload
-// client script when liveReload is set.
-func parseTemplates(liveReload bool) templates {
+// client script when liveReload is set. Pages show version in the header.
+func parseTemplates(liveReload bool, version string) templates {
 	parse := func(name string) *template.Template {
 		src := string(mustReadTemplateFile(name + ".html"))
 		if liveReload {
 			src = injectLiveReloadScript(src)
 		}
-		return template.Must(template.New(name).Parse(src))
+		funcs := template.FuncMap{"version": func() string { return version }}
+		return template.Must(template.New(name).Funcs(funcs).Parse(src))
 	}
 	return templates{
 		page:      parse("page"),

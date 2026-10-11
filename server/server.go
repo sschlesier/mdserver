@@ -37,6 +37,7 @@ type Config struct {
 	File             string
 	EnableLiveReload bool
 	Verbose          bool
+	Version          string
 }
 
 // Server represents the HTTP server
@@ -82,7 +83,7 @@ func NewServer(config Config) *Server {
 		}
 	}
 
-	s.templates = parseTemplates(s.liveReload != nil)
+	s.templates = parseTemplates(s.liveReload != nil, config.Version)
 	s.setupRoutes()
 	return s
 }
