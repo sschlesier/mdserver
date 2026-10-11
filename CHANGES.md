@@ -1,7 +1,12 @@
 # Changelog
 
-## Unreleased
+## v3.0.0
 
+- Show the version in the page header beside the settings icon
+- Inject the live reload script only when live reload is running, so pages served without it don't load a dead script
+- Never serve dotfiles or dot-directories at any depth: any path with a dot segment gets 404
+- Shut down when the served directory is renamed, even if another directory replaces it, and wait up to 2s for in-flight requests when the root goes missing
+- Fix a panic when the server is stopped twice, and keep a stuck live-reload client from blocking shutdown
 - **Breaking:** `/assets/<path>` now serves `<root>/assets/<path>`, so relative links into a folder's own `assets/` directory work. It used to serve `<root>/<path>`. mdserver's own stylesheet moves to `/_mdserver/style.css`, so a folder's `assets/style.css` is no longer shadowed
 - mdserver's stylesheet, page templates and favicon are built into the binary, so pages look the same wherever it runs. Homebrew installs, which never shipped `template/`, now get the full styling instead of a plain fallback. A `template/` folder beside the binary or in the working directory is no longer read, so it can't be used to override them
 - Every response tells the browser not to cache it (`Cache-Control: no-cache, no-store, must-revalidate`), so an open tab always shows current content. The favicon used to be cached for an hour
