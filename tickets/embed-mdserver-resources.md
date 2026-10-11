@@ -30,18 +30,18 @@ Out of scope:
 
 ## Acceptance criteria
 
-- [ ] `template/style.css`, `page.html`, `directory.html`, `settings.html` and `favicon.svg`
+- [x] `template/style.css`, `page.html`, `directory.html`, `settings.html` and `favicon.svg`
       are embedded with `go:embed`, and no code in `server/` reads them from disk.
-- [ ] A test starts the server from a working directory with no `template/` folder, with the
+- [x] A test starts the server from a working directory with no `template/` folder, with the
       binary's directory also lacking one, and checks that a Markdown page, a directory index,
       `/settings`, `/_mdserver/style.css` and `/favicon.svg` serve the full embedded content
       (not a fallback).
-- [ ] A test places a different `template/page.html` and `style.css` in the working directory
+- [x] A test places a different `template/page.html` and `style.css` in the working directory
       and checks they're ignored.
-- [ ] The inline fallbacks are removed (default page, directory and settings templates, default
+- [x] The inline fallbacks are removed (default page, directory and settings templates, default
       CSS, default favicon), since the embedded files can't be missing. The "full or default
       CSS" branch in `server/content_test.go` goes with them: the test asserts the full CSS.
-- [ ] `CHANGES.md` notes that on-disk `template/` files are no longer read.
+- [x] `CHANGES.md` notes that on-disk `template/` files are no longer read.
 
 ## Verification
 
@@ -74,3 +74,6 @@ template replacing a fallback.
 - 2026-10-11: Refined against the code. Decided: move `template/` under `server/`; fallbacks incl. settings and favicon removed; release doesn't ship `template/`.
 - 2026-10-11: Approved. Scott Schlesier, 2026-10-11: embed under server/template, remove all fallbacks. Cold read: not run
 - 2026-10-11: Started on branch embed-mdserver-resources
+- 2026-10-11: Implemented. The stylesheet and favicon go through `http.ServeContent` with the process start time as the modification time, so `Last-Modified`, `Accept-Ranges` and conditional requests stay as `http.ServeFile` gave them (the Design allowed dropping them for the favicon; nothing is dropped). Removed `TestTemplateFilesLinkStylesheet`: it read `../template/` from disk, and the handler test above it now covers the embedded templates.
+- 2026-10-11: Revert check: both new tests fail against the pre-change code (fallback CSS and favicon served; working-directory decoys served). The page-template checks alone pass there, since the old inline page templates had the same markup.
+- 2026-10-11: Manual check: binary built into an empty directory and run with `--dir tickets --no-open`; every page, the stylesheet and the favicon are byte-identical to a `go run .` from the checkout, and the CSS matches `server/template/style.css`.
