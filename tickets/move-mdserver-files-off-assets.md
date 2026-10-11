@@ -25,10 +25,10 @@ Out of scope:
 
 ## Acceptance criteria
 
-- [ ] mdserver's stylesheet is served at `/_mdserver/style.css`, and every page it renders
+- [x] mdserver's stylesheet is served at `/_mdserver/style.css`, and every page it renders
       (Markdown page, directory index, settings, shutdown page, 410 page if styled) links there.
-- [ ] `/assets/style.css` is no longer special: it follows the normal root rules.
-- [ ] A test serves a folder with `assets/logo.png` and `assets/style.css`, and checks that
+- [x] `/assets/style.css` is no longer special: it follows the normal root rules.
+- [x] A test serves a folder with `assets/logo.png` and `assets/style.css`, and checks that
       `/assets/logo.png` serves the folder's file and that a rendered page still gets
       mdserver's stylesheet.
 
@@ -48,3 +48,5 @@ Out of scope:
 ## Log
 - 2026-09-30: Approved: Scott Schlesier, 2026-09-30: approved after review of PR #3 findings. Cold read: not run
 - 2026-10-11: Started on branch move-mdserver-files-off-assets
+- 2026-10-11: Started on branch move-mdserver-files-off-assets
+- 2026-10-11: Implemented. The 410 page uses inline styles, so nothing to change there. Collision note (out of scope, not moved): `/settings`, `/livereload` and `/favicon.*` can still collide with root files of those names.
