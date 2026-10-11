@@ -5,7 +5,7 @@ type: bug
 priority: 3
 depends-on: [serve-only-markdown-and-images]
 approved: "Scott Schlesier, 2026-09-30: approved after review of PR #3 findings. Cold read: not run"
-status: in-review
+status: done
 ---
 
 mdserver's own stylesheet moves to a URL prefix no served folder would use, so a folder's own
@@ -52,3 +52,4 @@ Out of scope:
 - 2026-10-11: Implemented. The 410 page uses inline styles, so nothing to change there. Collision note (out of scope, not moved): `/settings`, `/livereload` and `/favicon.*` can still collide with root files of those names.
 - 2026-10-11: Review started
 - 2026-10-11: Review round 1 triage: fixed the untested settings page and template-file links (added tests). Dismissed: the shutdown page link mutant (handleShutdown calls os.Exit, so a test would kill the test process); no shared stylesheet-URL constant (refactor beyond spec); TestStylesheetLivesOffAssets overlapping the table test (it covers the folder-with-own-assets case the spec asks for); a root `_mdserver/` shadowed (accepted in Design).
+- 2026-10-11: Done: Reviewed round 1: all 3 criteria verified. Risk accepted by Scott Schlesier: an install with stale template/*.html beside the binary links the old /assets/style.css (now 404) and renders unstyled; the Homebrew formula was not checked for whether it ships template/.
