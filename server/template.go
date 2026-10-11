@@ -21,9 +21,6 @@ var (
 
 	//go:embed template/favicon.svg
 	faviconSVG []byte
-
-	// embeddedModTime is the Last-Modified time for the embedded files.
-	embeddedModTime = binaryModTime()
 )
 
 // binaryModTime returns the modification time of the running binary, which holds the
@@ -64,10 +61,10 @@ func parseTemplates(liveReload bool) templates {
 	}
 }
 
-// serveEmbedded writes an embedded file, answering conditional and range
-// requests as http.ServeFile would.
-func serveEmbedded(w http.ResponseWriter, r *http.Request, name string, content []byte) {
-	http.ServeContent(w, r, name, embeddedModTime, bytes.NewReader(content))
+// serveEmbedded writes an embedded file with the binary's modification time,
+// answering conditional and range requests as http.ServeFile would.
+func (s *Server) serveEmbedded(w http.ResponseWriter, r *http.Request, name string, content []byte) {
+	http.ServeContent(w, r, name, s.binaryModTime, bytes.NewReader(content))
 }
 
 func mustReadTemplateFile(name string) []byte {

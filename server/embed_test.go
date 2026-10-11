@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // newEmbedTestServer serves a root holding sub/doc.md, with live reload on so the settings
@@ -180,7 +181,13 @@ func TestEmbeddedFilesUseBinaryModTime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := info.ModTime().UTC().Format(http.TimeFormat)
+	// Backdate the test binary so its mtime can't be mistaken for the server's start time.
+	old := time.Date(2001, 2, 3, 4, 5, 6, 0, time.UTC)
+	if err := os.Chtimes(exe, old, old); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chtimes(exe, info.ModTime(), info.ModTime()) })
+	want := old.Format(http.TimeFormat)
 
 	h := newEmbedTestServer(t)
 	for _, path := range []string{"/_mdserver/style.css", "/favicon.svg"} {
