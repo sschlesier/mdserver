@@ -5,7 +5,7 @@ priority: 2
 depends-on: []
 parent:
 approved: "Scott Schlesier, 2026-10-17: approved after cold read; shortcut Alt-O, sahilm/fuzzy approved. Cold read: pass"
-status: in-review
+status: done
 ---
 
 Pressing Alt-O on any mdserver page opens a dropdown where typing fuzzy-matches the names of
@@ -156,3 +156,5 @@ watcher, or the shutdown endpoints.
 - 2026-10-17: Review started
 - 2026-10-17: Review round 1 triage. Fixed: result limit, walk cap and unreadable-directory tests; IME Enter guard, document-level Esc and aria-modal in picker.js. Dismissed: Cache-Control on /_mdserver/files (the noCache middleware already sets it on every response); os.Stat per entry (perf only, one user); FIFO named x.md (IsRegular guard kept, not tested portably); HEAD returns 405 (matches the logged GET-only assumption); stale "or no extension" comment in handleRequest (predates this change). Escalated: symlinks to one directory from two places both list its files.
 - 2026-10-17: Review round 1, second cold verify. Fixed: directory listing test for the shared predicate; picker clears stale results when reopened. Open for the person: symlinks reachable twice (see above), and the browser-only criteria.
+- 2026-10-17: Decision (Scott Schlesier): a directory reachable through two symlinks lists its files under both paths; pinned by a test.
+- 2026-10-17: Done: Reviewed round 1: Go-side criteria (1-6, 12 in the PR table) verified by tests; UI criteria (button, overlay, Alt-O, keyboard, empty/error states, highlighting, dark mode) left unticked and accepted unverified by Scott Schlesier — the picker script was run only against a DOM stub in node, never in a real browser.

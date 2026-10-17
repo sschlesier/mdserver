@@ -203,3 +203,18 @@ func TestFilesEndpointSkipsUnreadableDirectories(t *testing.T) {
 		t.Errorf("files = %v, want %v", got, want)
 	}
 }
+
+func TestFilesEndpointListsADirectoryReachedThroughTwoPaths(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, "real/page.md")
+	if err := os.Symlink(filepath.Join(root, "real"), filepath.Join(root, "alias")); err != nil {
+		t.Skip("symlinks unavailable:", err)
+	}
+
+	h := NewServer(Config{Host: "localhost", RootDir: root}).httpServer.Handler
+	got := resultPaths(searchFiles(t, h, ""))
+	want := []string{"alias/page.md", "real/page.md"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("files = %v, want %v", got, want)
+	}
+}
