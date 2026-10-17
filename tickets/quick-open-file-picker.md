@@ -5,7 +5,7 @@ priority: 2
 depends-on: []
 parent:
 approved: "Scott Schlesier, 2026-10-17: approved after cold read; shortcut Alt-O, sahilm/fuzzy approved. Cold read: pass"
-status: in-progress
+status: in-review
 ---
 
 Pressing Alt-O on any mdserver page opens a dropdown where typing fuzzy-matches the names of
@@ -153,3 +153,4 @@ watcher, or the shutdown endpoints.
 - 2026-10-17: Approved. Scott Schlesier, 2026-10-17: approved after cold read; shortcut Alt-O, sahilm/fuzzy approved. Cold read: pass
 - 2026-10-17: Started on branch quick-open-file-picker
 - 2026-10-17: Implemented in 5 commits. Go-side criteria (endpoint, matching, filter, new files, script served) are covered by tests. The UI criteria (button, overlay, keyboard, highlight, empty/error states) are unticked: no browser was available in this session, so picker.js is unrun. Assumptions: a directory named x.md is excluded; broken symlinks and unreadable directories are skipped silently; non-GET returns 405; the CHANGES.md entry is left to the release step.
+- 2026-10-17: Review started
