@@ -211,6 +211,9 @@ func (s *Server) setupRoutes() {
 	// mdserver's stylesheet lives under a prefix no served folder is expected to use.
 	s.mux.HandleFunc("/_mdserver/style.css", s.serveCSS)
 
+	// File picker search, under the same prefix.
+	s.mux.HandleFunc("/_mdserver/files", s.handleFiles)
+
 	// LiveReload WebSocket endpoint
 	if s.liveReload != nil {
 		s.mux.HandleFunc("/livereload", s.liveReload.HandleWebSocket)
