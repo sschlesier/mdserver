@@ -21,6 +21,7 @@
 		var box = document.createElement('div');
 		box.className = 'picker';
 		box.setAttribute('role', 'dialog');
+		box.setAttribute('aria-modal', 'true');
 		box.setAttribute('aria-label', 'Search files');
 
 		input = document.createElement('input');
@@ -161,10 +162,7 @@
 			move(-1);
 		} else if (e.key === 'Enter') {
 			e.preventDefault();
-			if (results[selected]) go(results[selected]);
-		} else if (e.key === 'Escape') {
-			e.preventDefault();
-			close();
+			if (!e.isComposing && results[selected]) go(results[selected]);
 		}
 	}
 
@@ -175,6 +173,14 @@
 			if (isOpen()) close(); else open();
 		}
 	}, true);
+
+	// Escape closes the picker even when focus has left the input.
+	document.addEventListener('keydown', function (e) {
+		if (e.key === 'Escape' && isOpen()) {
+			e.preventDefault();
+			close();
+		}
+	});
 
 	document.addEventListener('click', function (e) {
 		if (e.target.closest && e.target.closest('[data-picker-open]')) {
