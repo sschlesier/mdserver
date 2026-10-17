@@ -80,11 +80,11 @@ func TestFilesEndpointLimitsResults(t *testing.T) {
 		writeFiles(t, root, string(c)+"-note.md")
 	}
 	h := NewServer(Config{Host: "localhost", RootDir: root}).httpServer.Handler
-	if got := searchFiles(t, h, "note"); len(got) != maxPickerResults {
-		t.Errorf("got %d results, want %d", len(got), maxPickerResults)
+	if got := searchFiles(t, h, "note"); len(got) != 10 {
+		t.Errorf("got %d results, want 10", len(got))
 	}
-	if got := searchFiles(t, h, ""); len(got) != maxPickerResults {
-		t.Errorf("empty query: got %d results, want %d", len(got), maxPickerResults)
+	if got := searchFiles(t, h, ""); len(got) != 10 {
+		t.Errorf("empty query: got %d results, want 10", len(got))
 	}
 }
 
@@ -166,6 +166,40 @@ func TestFilesEndpointFollowsSymlinksAndStopsAtCycles(t *testing.T) {
 	got := resultPaths(searchFiles(t, h, ""))
 	want := []string{"link/linked.md", "real/page.md"}
 	if !reflect.DeepEqual(got, want) {
+		t.Errorf("files = %v, want %v", got, want)
+	}
+}
+
+func TestFilesEndpointStopsAtWalkCap(t *testing.T) {
+	old := maxWalkEntries
+	maxWalkEntries = 5
+	defer func() { maxWalkEntries = old }()
+
+	root := t.TempDir()
+	for _, c := range "abcdefghij" {
+		writeFiles(t, root, string(c)+".md")
+	}
+	h := NewServer(Config{Host: "localhost", RootDir: root}).httpServer.Handler
+	if got := searchFiles(t, h, ""); len(got) != 5 {
+		t.Errorf("got %d results with a cap of 5, want 5", len(got))
+	}
+}
+
+func TestFilesEndpointSkipsUnreadableDirectories(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root can read any directory")
+	}
+	root := t.TempDir()
+	writeFiles(t, root, "open/a.md", "locked/b.md")
+	locked := filepath.Join(root, "locked")
+	if err := os.Chmod(locked, 0); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chmod(locked, 0755)
+
+	h := NewServer(Config{Host: "localhost", RootDir: root}).httpServer.Handler
+	got := resultPaths(searchFiles(t, h, ""))
+	if want := []string{"open/a.md"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("files = %v, want %v", got, want)
 	}
 }

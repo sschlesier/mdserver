@@ -9,13 +9,12 @@ import (
 	"strings"
 )
 
-const (
-	// maxPickerResults is how many matches the file picker gets.
-	maxPickerResults = 10
+// maxPickerResults is how many matches the file picker gets.
+const maxPickerResults = 10
 
-	// maxWalkEntries bounds how many directory entries one picker request visits.
-	maxWalkEntries = 50000
-)
+// maxWalkEntries bounds how many directory entries one picker request visits;
+// tests lower it.
+var maxWalkEntries = 50000
 
 // pageFiles lists the root-relative, slash-separated paths of every page file under
 // the root, skipping dot segments and following symlinks. The walk stops after
