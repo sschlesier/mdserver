@@ -394,3 +394,110 @@ hr {
 	}
 }
 
+
+/* File picker */
+.picker-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4em;
+	margin-left: auto;
+	padding: 2px 8px;
+	font: inherit;
+	font-size: 0.85em;
+	color: var(--text-color);
+	background: transparent;
+	border: 1px solid var(--border-color);
+	border-radius: 4px;
+	opacity: 0.7;
+	cursor: pointer;
+	flex-shrink: 0;
+}
+
+.picker-button:hover,
+.picker-button:focus-visible {
+	opacity: 1;
+	color: var(--link-color);
+}
+
+.picker-button + .version,
+.picker-button + .settings-icon {
+	margin-left: 0.5em;
+}
+
+.picker-hint {
+	font-family: inherit;
+	font-size: 0.85em;
+	opacity: 0.6;
+}
+
+.picker-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 1000;
+	display: flex;
+	justify-content: center;
+	align-items: flex-start;
+	padding-top: 15vh;
+	background: rgba(0, 0, 0, 0.4);
+}
+
+.picker-overlay[hidden] {
+	display: none;
+}
+
+.picker {
+	width: min(40em, calc(100vw - 2em));
+	max-height: 70vh;
+	display: flex;
+	flex-direction: column;
+	background: var(--bg-color);
+	color: var(--text-color);
+	border: 1px solid var(--border-color);
+	border-radius: 8px;
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+	overflow: hidden;
+}
+
+.picker-input {
+	padding: 0.75em 1em;
+	font: inherit;
+	color: inherit;
+	background: transparent;
+	border: 0;
+	border-bottom: 1px solid var(--border-color);
+	outline: none;
+}
+
+.picker-results {
+	list-style: none;
+	margin: 0;
+	padding: 0.25em;
+	overflow-y: auto;
+}
+
+.picker-result,
+.picker-empty {
+	padding: 0.4em 0.75em;
+	border-radius: 4px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.picker-result {
+	cursor: pointer;
+}
+
+.picker-result.selected {
+	background: var(--code-bg);
+}
+
+.picker-result mark {
+	background: transparent;
+	color: var(--link-color);
+	font-weight: 600;
+}
+
+.picker-empty {
+	opacity: 0.6;
+}

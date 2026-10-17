@@ -38,6 +38,7 @@ mdserver --version
 - Fast Markdown to HTML rendering with GitHub Flavored Markdown support
 - Image serving (`.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`, `.webp`); other non-Markdown files get 404
 - Directory index browsing
+- Quick file search: press `Alt+O` (`⌥O` on macOS) or click the header's Search button to fuzzy-match Markdown file names under the served directory
 - Auto port selection
 - Single binary distribution
 

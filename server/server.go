@@ -211,6 +211,10 @@ func (s *Server) setupRoutes() {
 	// mdserver's stylesheet lives under a prefix no served folder is expected to use.
 	s.mux.HandleFunc("/_mdserver/style.css", s.serveCSS)
 
+	// File picker script and search, under the same prefix.
+	s.mux.HandleFunc("/_mdserver/picker.js", s.servePickerJS)
+	s.mux.HandleFunc("/_mdserver/files", s.handleFiles)
+
 	// LiveReload WebSocket endpoint
 	if s.liveReload != nil {
 		s.mux.HandleFunc("/livereload", s.liveReload.HandleWebSocket)
@@ -236,6 +240,12 @@ func (s *Server) serveCSS(w http.ResponseWriter, r *http.Request) {
 	log.Printf("file: style.css (embedded)")
 	w.Header().Set("Content-Type", "text/css; charset=utf-8")
 	serveEmbedded(w, r, "style.css", styleCSS)
+}
+
+// servePickerJS serves the file picker script
+func (s *Server) servePickerJS(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	serveEmbedded(w, r, "picker.js", pickerJS)
 }
 
 // handleRequest serves paths under the root: directory listings, rendered Markdown and images.
@@ -275,7 +285,7 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	// Check if it's a markdown file (has .md extension or no extension)
 	ext := filepath.Ext(filePath)
-	if strings.EqualFold(ext, ".md") {
+	if isPageFile(filePath) {
 		if s.isValidPath(filePath) {
 			s.handleMarkdown(w, r, filePath)
 			return
@@ -291,6 +301,11 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	// Not Markdown: serve it if it's an allowlisted image
 	s.handleStaticFile(w, r, filePath)
+}
+
+// isPageFile reports whether a file name is one mdserver renders as a page.
+func isPageFile(name string) bool {
+	return strings.EqualFold(filepath.Ext(name), ".md")
 }
 
 // isValidPath checks if a file path is within the root directory (security)
