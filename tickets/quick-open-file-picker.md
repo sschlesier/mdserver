@@ -29,22 +29,22 @@ Out of scope:
 
 ## Acceptance criteria
 
-- [ ] `GET /_mdserver/files?q=<query>` returns `200` with a JSON array of at most 10 objects
+- [x] `GET /_mdserver/files?q=<query>` returns `200` with a JSON array of at most 10 objects
       `{"path": "<root-relative path, forward slashes>", "href": "<URL path>", "matches": [<indexes of
       matched characters in path>]}`, best match first, and `Content-Type: application/json`. No
       CORS headers are sent.
-- [ ] Matching is fzf-style: a query matches a file when its characters appear in order in the
+- [x] Matching is fzf-style: a query matches a file when its characters appear in order in the
       file's root-relative path, case-insensitively (`rdme` matches `docs/README.md`). Files
       that don't match are not returned. Ranking rewards consecutive characters and matches at
       word starts and path separators. Pinned by tests: `readme` ranks `README.md` above
       `docs/old-readme-notes.md`, and `ghi` ranks `guides/home-install.md` above
       `guides/zzghizz.md`. Ties break by path, alphabetically.
-- [ ] An empty or missing `q` returns the first 10 files alphabetically by path.
-- [ ] Only files that mdserver opens as a page (today: `.md` in any case) are returned. Files
+- [x] An empty or missing `q` returns the first 10 files alphabetically by path.
+- [x] Only files that mdserver opens as a page (today: `.md` in any case) are returned. Files
       and directories with a dot segment anywhere in their root-relative path are never
       returned. Nothing outside the root is returned. The picker and the page handler use one
       shared predicate for "is a page file", so widening it later changes both.
-- [ ] A new file added to the root appears in results on the next request without restarting
+- [x] A new file added to the root appears in results on the next request without restarting
       the server or visiting its directory.
 - [ ] Every rendered page and directory listing shows a "Search files" button with a hint of the
       shortcut (`⌥O` on macOS, `Alt+O` elsewhere) in the header row next to the version and settings icon. Clicking it
@@ -60,7 +60,7 @@ Out of scope:
       "Search unavailable".
 - [ ] The matching characters of each result (from `matches`) are visibly emphasized, and the
       overlay follows the page's existing colors, including dark mode if `style.css` supports it.
-- [ ] The picker's script is served from `/_mdserver/picker.js` (embedded in the binary, like
+- [x] The picker's script is served from `/_mdserver/picker.js` (embedded in the binary, like
       `style.css`) and is loaded on page and directory templates. It works with live reload
       off.
 
@@ -152,3 +152,4 @@ watcher, or the shutdown endpoints.
 
 - 2026-10-17: Approved. Scott Schlesier, 2026-10-17: approved after cold read; shortcut Alt-O, sahilm/fuzzy approved. Cold read: pass
 - 2026-10-17: Started on branch quick-open-file-picker
+- 2026-10-17: Implemented in 5 commits. Go-side criteria (endpoint, matching, filter, new files, script served) are covered by tests. The UI criteria (button, overlay, keyboard, highlight, empty/error states) are unticked: no browser was available in this session, so picker.js is unrun. Assumptions: a directory named x.md is excluded; broken symlinks and unreadable directories are skipped silently; non-GET returns 405; the CHANGES.md entry is left to the release step.
