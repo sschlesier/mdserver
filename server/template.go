@@ -18,6 +18,9 @@ var (
 	//go:embed template/style.css
 	styleCSS []byte
 
+	//go:embed template/picker.js
+	pickerJS []byte
+
 	//go:embed template/favicon.svg
 	faviconSVG []byte
 )

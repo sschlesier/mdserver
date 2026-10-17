@@ -211,7 +211,8 @@ func (s *Server) setupRoutes() {
 	// mdserver's stylesheet lives under a prefix no served folder is expected to use.
 	s.mux.HandleFunc("/_mdserver/style.css", s.serveCSS)
 
-	// File picker search, under the same prefix.
+	// File picker script and search, under the same prefix.
+	s.mux.HandleFunc("/_mdserver/picker.js", s.servePickerJS)
 	s.mux.HandleFunc("/_mdserver/files", s.handleFiles)
 
 	// LiveReload WebSocket endpoint
@@ -239,6 +240,12 @@ func (s *Server) serveCSS(w http.ResponseWriter, r *http.Request) {
 	log.Printf("file: style.css (embedded)")
 	w.Header().Set("Content-Type", "text/css; charset=utf-8")
 	serveEmbedded(w, r, "style.css", styleCSS)
+}
+
+// servePickerJS serves the file picker script
+func (s *Server) servePickerJS(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	serveEmbedded(w, r, "picker.js", pickerJS)
 }
 
 // handleRequest serves paths under the root: directory listings, rendered Markdown and images.
