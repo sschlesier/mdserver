@@ -62,6 +62,8 @@
 		opener = document.activeElement;
 		overlay.hidden = false;
 		input.value = '';
+		results = [];
+		list.textContent = '';
 		input.focus();
 		search();
 	}
