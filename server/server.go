@@ -275,7 +275,7 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	// Check if it's a markdown file (has .md extension or no extension)
 	ext := filepath.Ext(filePath)
-	if strings.EqualFold(ext, ".md") {
+	if isPageFile(filePath) {
 		if s.isValidPath(filePath) {
 			s.handleMarkdown(w, r, filePath)
 			return
@@ -291,6 +291,11 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	// Not Markdown: serve it if it's an allowlisted image
 	s.handleStaticFile(w, r, filePath)
+}
+
+// isPageFile reports whether a file name is one mdserver renders as a page.
+func isPageFile(name string) bool {
+	return strings.EqualFold(filepath.Ext(name), ".md")
 }
 
 // isValidPath checks if a file path is within the root directory (security)

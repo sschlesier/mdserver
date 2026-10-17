@@ -133,7 +133,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, dirPath str
 		}
 
 		// Only include directories or markdown files
-		isMarkdown := !entry.IsDir() && strings.HasSuffix(strings.ToLower(entry.Name()), ".md")
+		isMarkdown := !entry.IsDir() && isPageFile(entry.Name())
 		if !entry.IsDir() && !isMarkdown {
 			continue
 		}
