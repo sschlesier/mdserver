@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.1.0
+
+- Add a quick file picker: press Alt-O (or use the new header button) to fuzzy-search the Markdown pages and directories under the served root and jump to one
+- Add `/_mdserver/files` search endpoint that backs the picker; it lists only pages and directories, never dotfiles, and follows symlinks inside the root
+- Document the quick file search in the README
+
 ## v3.0.0
 
 - Show the version in the page header beside the settings icon
