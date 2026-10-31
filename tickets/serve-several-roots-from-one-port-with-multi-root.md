@@ -99,3 +99,4 @@ Don't touch: the accepted-risk entries and their "valid while" lines in CLAUDE.m
 - 2026-10-31: Started on branch multi-root
 - 2026-10-31: Assumption: criterion 16 left unticked - picker.js and the live reload client script are not exercised in a real browser, only their server side; criterion 17 shutdown is the unchanged global handler, untested. Manual step 5: Go mux answers /a/../b/x.md with 307 to /b/x.md, not 301; never 200.
 - 2026-10-31: Status: in-review
+- 2026-10-31: Review round 1 triage: fixed explicit --port 0 beating config port; added tests for subdirectory .. prefix and watcher-only gone flag. Dismissed: equivalent mutants (port in reserved map, /private/var on macOS), remove-watch with trailing-slash dir (RemoveWatch matches exact key), untested browser-open URL/noOpen branches. Escalated: picker.js and live reload client root= query have no browser test.
