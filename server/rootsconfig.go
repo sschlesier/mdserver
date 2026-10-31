@@ -124,7 +124,17 @@ func expandRootPath(path, home string) (string, error) {
 	}
 }
 
-// checkRootDir requires dir to exist and be a directory.
+// refusedRootDirs are directories that cannot be a root themselves (their
+// subdirectories can). They guard against the obvious mistakes of serving
+// everything; edit the list here.
+var refusedRootDirs = []string{
+	"/", "/Users", "/home", "/etc", "/var", "/usr", "/bin", "/sbin", "/opt",
+	"/private", "/private/var", "/private/etc", "/System", "/Library",
+}
+
+// checkRootDir requires dir to exist, be a directory and, once symlinks are
+// resolved, not be a refused directory, the home directory or one of its
+// ancestors.
 func checkRootDir(dir, home string) error {
 	info, err := os.Stat(dir)
 	if err != nil {
@@ -133,5 +143,85 @@ func checkRootDir(dir, home string) error {
 	if !info.IsDir() {
 		return fmt.Errorf("path is not a directory: %s", dir)
 	}
+
+	resolved, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return fmt.Errorf("cannot resolve path %s: %v", dir, err)
+	}
+
+	for _, refused := range refusedRootDirs {
+		if sameDir(resolved, refused) {
+			return fmt.Errorf("refusing to serve %s: too broad", resolved)
+		}
+	}
+
+	if home != "" {
+		homes := []string{home}
+		if realHome, err := filepath.EvalSymlinks(home); err == nil {
+			homes = append(homes, realHome)
+		}
+		for _, h := range homes {
+			if sameDir(resolved, h) {
+				return fmt.Errorf("refusing to serve the home directory %s", resolved)
+			}
+			if isAncestor(resolved, h) {
+				return fmt.Errorf("refusing to serve %s: it contains the home directory", resolved)
+			}
+		}
+	}
 	return nil
+}
+
+// sameDir reports whether resolved (already symlink-free) is the same
+// directory as other, which is resolved here too when it exists.
+func sameDir(resolved, other string) bool {
+	if resolved == filepath.Clean(other) {
+		return true
+	}
+	real, err := filepath.EvalSymlinks(other)
+	return err == nil && resolved == real
+}
+
+// isAncestor reports whether dir is a proper ancestor of path.
+func isAncestor(dir, path string) bool {
+	rel, err := filepath.Rel(dir, path)
+	return err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+// ConfigPath returns the config file to read. A non-empty arg is used as
+// given. Otherwise it is $XDG_CONFIG_HOME/mdserver/roots when XDG_CONFIG_HOME
+// is set and that file exists, else ~/.config/mdserver/roots. When the file
+// does not exist the error names every path looked at; nothing is created.
+func ConfigPath(arg string) (string, error) {
+	var candidates []string
+	if arg != "" {
+		candidates = []string{arg}
+	} else {
+		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+			candidates = append(candidates, filepath.Join(xdg, "mdserver", "roots"))
+		}
+		if home, err := os.UserHomeDir(); err == nil && home != "" {
+			candidates = append(candidates, filepath.Join(home, ".config", "mdserver", "roots"))
+		}
+	}
+
+	for _, c := range candidates {
+		if info, err := os.Stat(c); err == nil && !info.IsDir() {
+			return c, nil
+		}
+	}
+	if len(candidates) == 0 {
+		return "", fmt.Errorf("no config file: cannot determine the home directory")
+	}
+	return "", fmt.Errorf("config file not found; looked at: %s", strings.Join(candidates, ", "))
+}
+
+// LoadRootsConfig reads and parses the config file at path.
+func LoadRootsConfig(path string) (RootsConfig, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return RootsConfig{}, err
+	}
+	home, _ := os.UserHomeDir()
+	return ParseRootsConfig(data, path, home)
 }
