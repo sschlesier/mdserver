@@ -27,7 +27,7 @@ Out of scope:
 - [x] Link titles, link text, image alt text, reference-style links (`[x][r]` with `[r]: /a.md`), links inside lists, tables and block quotes, and autolinked bare URLs behave correctly: only destinations that start with a single `/` are changed.
 - [x] Code spans and fenced code blocks that contain text like `[x](/a.md)` are not changed.
 - [x] `RenderMarkdown(md)` and `RenderMarkdownWithBase(md, "")` produce byte-identical output to each other and to the output of the current `RenderMarkdown` for every existing renderer test input; existing renderer tests pass unmodified.
-- [ ] `RenderStandalone` and the `--render` output are byte-identical to today.
+- [x] `RenderStandalone` and the `--render` output are byte-identical to today.
 - [x] Mermaid post-processing still applies with a base set.
 - [x] Output with a base is HTML-safe: a base or destination containing quotes or angle brackets cannot break out of the attribute (the rewritten destination goes through the same escaping as an unrewritten one).
 
@@ -69,3 +69,4 @@ Don't touch: `server/`, `main.go`, `renderer/standalone.css`.
 - 2026-10-31: Started on branch rewrite-root-relative-links
 - 2026-10-31: Criterion 7 (RenderStandalone/--render identical) left unticked: that code is unchanged and still calls RenderMarkdown, which the golden test pins; no direct before/after comparison of the standalone document was run.
 - 2026-10-31: Status: in-review
+- 2026-10-31: Review round 1 dismissed: per-base renderer cache is never evicted (callers pass a small fixed set of names per spec 2); base "/" or a trailing slash yields //x (spec says callers pass a valid base, not covered); NewRenderer still returns the unprefixed instance (nothing calls it); mutants that skip the cache or the empty-base shortcut are equivalent (performance only).
