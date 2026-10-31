@@ -55,14 +55,13 @@ type Server struct {
 
 // NewServer creates a new server instance serving config.RootDir as its only root.
 func NewServer(config Config) *Server {
-	s := newServerShell(config)
-	s.roots = []*root{s.newRoot(config.RootDir, s.shutdownRootMissing)}
-	s.finish()
-	return s
+	return newServer(config, config.RootDir)
 }
 
-// newServerShell returns a Server with no roots; callers add roots and call finish.
-func newServerShell(config Config) *Server {
+// newServer creates a server with one root per directory. Production passes
+// one; tests pass several to check that roots stay apart. The first root is
+// the one whose removal shuts the server down.
+func newServer(config Config, dirs ...string) *Server {
 	s := &Server{
 		config:       config,
 		mux:          http.NewServeMux(),
@@ -73,13 +72,18 @@ func newServerShell(config Config) *Server {
 		Addr:    fmt.Sprintf("%s:%d", config.Host, config.Port),
 		Handler: noCache(s.requireRoot(s.mux)),
 	}
-	return s
-}
 
-// finish parses the templates and registers the routes once roots is set.
-func (s *Server) finish() {
-	s.templates = parseTemplates(s.hasLiveReload(), s.config.Version)
+	for i, dir := range dirs {
+		var onRemoved func()
+		if i == 0 {
+			onRemoved = s.shutdownRootMissing
+		}
+		s.roots = append(s.roots, s.newRoot(dir, onRemoved))
+	}
+
+	s.templates = parseTemplates(s.hasLiveReload(), config.Version)
 	s.setupRoutes()
+	return s
 }
 
 // newRoot creates a root for dir with its own LiveReload when live reload is

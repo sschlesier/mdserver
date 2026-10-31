@@ -17,11 +17,7 @@ import (
 // that roots stay apart before requests can choose among them.
 func newServerWithRoots(t *testing.T, config Config, dirs ...string) *Server {
 	t.Helper()
-	s := newServerShell(config)
-	for _, dir := range dirs {
-		s.roots = append(s.roots, s.newRoot(dir, nil))
-	}
-	s.finish()
+	s := newServer(config, dirs...)
 	t.Cleanup(s.Stop)
 	return s
 }
