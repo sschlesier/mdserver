@@ -23,14 +23,16 @@ var standaloneCSS string
 var mdRenderer goldmark.Markdown
 
 func init() {
-	// Initialize goldmark with GitHub Flavored Markdown extensions
-	mdRenderer = goldmark.New(
-		goldmark.WithExtensions(
-			extension.GFM, // GitHub Flavored Markdown (tables, strikethrough, task lists, autolinks)
-		),
-		goldmark.WithParserOptions(
-			parser.WithAutoHeadingID(),
-		),
+	mdRenderer = newGoldmark()
+}
+
+// newGoldmark builds a goldmark instance with GitHub Flavored Markdown
+// (tables, strikethrough, task lists, autolinks); extra parser options are
+// appended to the common ones.
+func newGoldmark(extra ...parser.Option) goldmark.Markdown {
+	return goldmark.New(
+		goldmark.WithExtensions(extension.GFM),
+		goldmark.WithParserOptions(append([]parser.Option{parser.WithAutoHeadingID()}, extra...)...),
 		goldmark.WithRendererOptions(
 			html.WithHardWraps(),
 			html.WithXHTML(),
@@ -81,19 +83,9 @@ func rendererForBase(base string) goldmark.Markdown {
 	if r, ok := baseRenderers[base]; ok {
 		return r
 	}
-	r := goldmark.New(
-		goldmark.WithExtensions(extension.GFM),
-		goldmark.WithParserOptions(
-			parser.WithAutoHeadingID(),
-			parser.WithASTTransformers(
-				util.Prioritized(baseRewriter{base: []byte(base)}, 100),
-			),
-		),
-		goldmark.WithRendererOptions(
-			html.WithHardWraps(),
-			html.WithXHTML(),
-		),
-	)
+	r := newGoldmark(parser.WithASTTransformers(
+		util.Prioritized(baseRewriter{base: []byte(base)}, 100),
+	))
 	baseRenderers[base] = r
 	return r
 }
