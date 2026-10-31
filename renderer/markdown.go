@@ -6,11 +6,15 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/renderer/html"
+	"github.com/yuin/goldmark/text"
+	"github.com/yuin/goldmark/util"
 )
 
 //go:embed standalone.css
@@ -34,10 +38,77 @@ func init() {
 	)
 }
 
+// baseRewriter prefixes root-relative link and image destinations with base.
+type baseRewriter struct {
+	base []byte
+}
+
+func (b baseRewriter) Transform(node *ast.Document, reader text.Reader, pc parser.Context) {
+	_ = ast.Walk(node, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+		var dest *[]byte
+		switch v := n.(type) {
+		case *ast.Link:
+			dest = &v.Destination
+		case *ast.Image:
+			dest = &v.Destination
+		default:
+			return ast.WalkContinue, nil
+		}
+		d := *dest
+		if len(d) > 0 && d[0] == '/' && !bytes.HasPrefix(d, []byte("//")) {
+			*dest = append(append([]byte{}, b.base...), d...)
+		}
+		return ast.WalkContinue, nil
+	})
+}
+
+var (
+	baseMu        sync.Mutex
+	baseRenderers = map[string]goldmark.Markdown{}
+)
+
+// rendererForBase returns the shared renderer for an empty base, or a cached
+// renderer that rewrites root-relative destinations under base.
+func rendererForBase(base string) goldmark.Markdown {
+	if base == "" {
+		return mdRenderer
+	}
+	baseMu.Lock()
+	defer baseMu.Unlock()
+	if r, ok := baseRenderers[base]; ok {
+		return r
+	}
+	r := goldmark.New(
+		goldmark.WithExtensions(extension.GFM),
+		goldmark.WithParserOptions(
+			parser.WithAutoHeadingID(),
+			parser.WithASTTransformers(
+				util.Prioritized(baseRewriter{base: []byte(base)}, 100),
+			),
+		),
+		goldmark.WithRendererOptions(
+			html.WithHardWraps(),
+			html.WithXHTML(),
+		),
+	)
+	baseRenderers[base] = r
+	return r
+}
+
 // RenderMarkdown converts markdown content to HTML
 func RenderMarkdown(markdown []byte) ([]byte, error) {
+	return RenderMarkdownWithBase(markdown, "")
+}
+
+// RenderMarkdownWithBase converts markdown to HTML, rewriting link and image
+// destinations that start with a single "/" to live under base. base is empty
+// or a path with a leading slash and no trailing slash, such as "/notes".
+func RenderMarkdownWithBase(markdown []byte, base string) ([]byte, error) {
 	var buf bytes.Buffer
-	if err := mdRenderer.Convert(markdown, &buf); err != nil {
+	if err := rendererForBase(base).Convert(markdown, &buf); err != nil {
 		return nil, err
 	}
 	htmlContent := buf.Bytes()
