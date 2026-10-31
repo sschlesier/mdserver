@@ -242,7 +242,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		{Href: "/settings", Text: "Settings"},
 	}
 
-	rt := s.rootFor(r)
+	rt := s.roots[0]
 	var watchedDirs []WatchedDir
 	liveReloadEnabled := rt.liveReload != nil
 
@@ -319,7 +319,7 @@ func (s *Server) handleRemoveWatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Reject removal of root directory
-	rt := s.rootFor(r)
+	rt := s.roots[0]
 	absRoot, _ := filepath.Abs(rt.dir)
 	if dir == absRoot {
 		http.Error(w, "Cannot remove root directory watcher", http.StatusBadRequest)

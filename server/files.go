@@ -85,7 +85,7 @@ func (s *Server) handleFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	matches := matchFiles(r.URL.Query().Get("q"), s.rootFor(r).pageFiles(), maxPickerResults)
+	matches := matchFiles(r.URL.Query().Get("q"), s.roots[0].pageFiles(), maxPickerResults)
 	results := make([]fileResult, len(matches))
 	for i, m := range matches {
 		results[i] = fileResult{Path: m.Path, Href: pageHref(m.Path), Matches: m.Matches}
