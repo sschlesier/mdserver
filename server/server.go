@@ -350,6 +350,10 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	if s.multi && !rt.available() {
+		serveRootMissing(w, rt)
+		return
+	}
 	path, kind, status := rt.resolve(inner)
 
 	switch status {

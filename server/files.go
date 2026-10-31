@@ -92,6 +92,10 @@ func (s *Server) handleFiles(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
+		if !rt.available() {
+			http.Error(w, "Folder missing", http.StatusGone)
+			return
+		}
 	}
 
 	matches := matchFiles(r.URL.Query().Get("q"), rt.pageFiles(), maxPickerResults)

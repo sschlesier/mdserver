@@ -237,6 +237,35 @@ type WatchedDir struct {
 	IsRoot  bool
 }
 
+// WatchedGroup is one root's watched directories on the multi-root settings page.
+type WatchedGroup struct {
+	Name string
+	Dirs []WatchedDir
+}
+
+// watchedDirs lists the directories the root's live reload watches, or nil when
+// it has none.
+func (rt *root) watchedDirs() []WatchedDir {
+	if rt.liveReload == nil {
+		return nil
+	}
+	var dirs []WatchedDir
+	absRoot, _ := filepath.Abs(rt.dir)
+	for _, dir := range rt.liveReload.WatchedDirs() {
+		rel, err := filepath.Rel(absRoot, dir)
+		if err != nil {
+			rel = dir
+		}
+		isRoot := dir == absRoot
+		display := rel
+		if isRoot {
+			display = "."
+		}
+		dirs = append(dirs, WatchedDir{Path: dir, Display: display, IsRoot: isRoot})
+	}
+	return dirs
+}
+
 // handleSettings renders the settings page.
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -249,42 +278,34 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		{Href: "/settings", Text: "Settings"},
 	}
 
-	rt := s.roots[0]
 	var watchedDirs []WatchedDir
-	liveReloadEnabled := rt.liveReload != nil
+	var groups []WatchedGroup
+	liveReloadEnabled := s.hasLiveReload()
 
-	if liveReloadEnabled {
-		absRoot, _ := filepath.Abs(rt.dir)
-		for _, dir := range rt.liveReload.WatchedDirs() {
-			rel, err := filepath.Rel(absRoot, dir)
-			if err != nil {
-				rel = dir
-			}
-			isRoot := dir == absRoot
-			display := rel
-			if isRoot {
-				display = "."
-			}
-			watchedDirs = append(watchedDirs, WatchedDir{
-				Path:    dir,
-				Display: display,
-				IsRoot:  isRoot,
-			})
+	if s.multi {
+		for _, rt := range s.roots {
+			groups = append(groups, WatchedGroup{Name: rt.name, Dirs: rt.watchedDirs()})
 		}
+	} else {
+		watchedDirs = s.roots[0].watchedDirs()
 	}
 
 	tmpl := s.templates.settings
 
 	data := struct {
-		Title              string
-		Breadcrumbs        []Breadcrumb
-		WatchedDirs        []WatchedDir
-		LiveReloadEnabled  bool
-		HasRoot            bool
+		Title             string
+		Breadcrumbs       []Breadcrumb
+		WatchedDirs       []WatchedDir
+		Groups            []WatchedGroup
+		Multi             bool
+		LiveReloadEnabled bool
+		HasRoot           bool
 	}{
 		Title:             "Settings",
 		Breadcrumbs:       breadcrumbs,
 		WatchedDirs:       watchedDirs,
+		Groups:            groups,
+		Multi:             s.multi,
 		LiveReloadEnabled: liveReloadEnabled,
 		HasRoot:           !s.multi,
 	}
@@ -327,8 +348,21 @@ func (s *Server) handleRemoveWatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Reject removal of root directory
+	// Multi-root requests name the root whose watch is removed; a directory of
+	// another root is never touched.
 	rt := s.roots[0]
+	if s.multi {
+		if rt = s.rootNamed(r.FormValue("root")); rt == nil {
+			http.Error(w, "Unknown root", http.StatusBadRequest)
+			return
+		}
+		if !rt.contains(dir) {
+			http.Error(w, "Directory is not in the root", http.StatusBadRequest)
+			return
+		}
+	}
+
+	// Reject removal of root directory
 	absRoot, _ := filepath.Abs(rt.dir)
 	if dir == absRoot {
 		http.Error(w, "Cannot remove root directory watcher", http.StatusBadRequest)

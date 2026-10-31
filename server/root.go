@@ -97,11 +97,6 @@ func (rt *root) resolve(urlPath string) (string, resolveKind, int) {
 	return filePath, kindImage, http.StatusOK
 }
 
-// unavailable reports whether the root's directory has been seen missing.
-func (rt *root) unavailable() bool {
-	return rt.gone.Load()
-}
-
 // exists reports whether the root directory is still present. Errors other
 // than "not exist" (e.g. permissions) are treated as present.
 func (rt *root) exists() bool {
