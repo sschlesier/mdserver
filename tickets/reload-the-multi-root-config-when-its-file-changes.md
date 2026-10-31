@@ -87,3 +87,4 @@ Don't touch: the config grammar and validation rules from spec 2 (reuse them as 
 - 2026-10-31: Status: in-progress
 - 2026-10-31: Assumption: a changed port line is compared with the config's own port line at startup (0 when absent), not with --port; unreadable-file case shares the missing-file code path and is covered by the deletion test only
 - 2026-10-31: Status: in-review: Implemented on reload-multi-root-config; go test -race, vet, build pass
+- 2026-10-31: Review round 1 triage: added tests for stop-on-revive, picker revival, revive branches, unrelated-file filter and serialised reloads; dismissed WatchConfig/Errors-branch coverage as low value and the first-pass sameRootDir mutant as equivalent (unused fresh roots are never created for kept names)
