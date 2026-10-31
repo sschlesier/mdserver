@@ -6,7 +6,7 @@ priority: 2
 depends-on: []
 parent:
 approved: "Scott Schlesier, 2026-10-31: Renderer prefix option (RenderMarkdownWithBase), golden-pinned unprefixed output; prerequisite for multi-root. Cold read: pass"
-status: in-review
+status: done
 ---
 
 The renderer can render Markdown so that links and images whose destination starts with a single `/` point under a given URL prefix, while rendering without a prefix stays exactly as it is today.
@@ -70,3 +70,4 @@ Don't touch: `server/`, `main.go`, `renderer/standalone.css`.
 - 2026-10-31: Criterion 7 (RenderStandalone/--render identical) left unticked: that code is unchanged and still calls RenderMarkdown, which the golden test pins; no direct before/after comparison of the standalone document was run.
 - 2026-10-31: Status: in-review
 - 2026-10-31: Review round 1 dismissed: per-base renderer cache is never evicted (callers pass a small fixed set of names per spec 2); base "/" or a trailing slash yields //x (spec says callers pass a valid base, not covered); NewRenderer still returns the unprefixed instance (nothing calls it); mutants that skip the cache or the empty-base shortcut are equivalent (performance only).
+- 2026-10-31: Status: done: Reviewed round 1: 9/9 criteria verified; two cold-verify passes; fixes: shared goldmark options, tests for structure, bare paths and hard wraps
