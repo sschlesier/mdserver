@@ -29,9 +29,12 @@ var newLiveReload = NewLiveReload
 
 // Config holds server configuration
 type Config struct {
-	Host             string
-	Port             int
+	Host string
+	Port int
+	// RootDir is the one directory served at / in single-root mode. Roots is
+	// the set served at /<name>/ in multi-root mode. Exactly one is set.
 	RootDir          string
+	Roots            []Root
 	File             string
 	EnableLiveReload bool
 	Verbose          bool
@@ -43,6 +46,7 @@ type Server struct {
 	config     Config
 	mux        *http.ServeMux
 	roots      []*root
+	multi      bool
 	httpServer *http.Server
 	templates  templates
 
@@ -53,18 +57,47 @@ type Server struct {
 	stopOnce sync.Once
 }
 
-// NewServer creates a new server instance serving config.RootDir as its only root.
+// NewServer creates a new server instance. With config.Roots set it serves each
+// root at /<name>/; otherwise it serves config.RootDir as its only root at /.
 func NewServer(config Config) *Server {
+	if len(config.Roots) > 0 {
+		return newMultiServer(config)
+	}
 	return newServer(config, config.RootDir)
 }
 
-// newServer creates a server with one root per directory. Production passes
-// one; tests pass several to check that roots stay apart. The first root is
-// the one whose removal shuts the server down.
+// newServer creates a single-root-style server with one unprefixed root per
+// directory. Production passes one; tests pass several to check that roots
+// stay apart. The first root is the one whose removal shuts the server down.
 func newServer(config Config, dirs ...string) *Server {
+	s := newBareServer(config, false)
+	for i, dir := range dirs {
+		var onRemoved func(*root)
+		if i == 0 {
+			onRemoved = func(*root) { s.shutdownRootMissing() }
+		}
+		s.roots = append(s.roots, s.newRoot("", dir, onRemoved))
+	}
+	s.finish()
+	return s
+}
+
+// newMultiServer creates a server with one root per config.Roots entry, each
+// served under its own /<name>/ prefix.
+func newMultiServer(config Config) *Server {
+	s := newBareServer(config, true)
+	for _, r := range config.Roots {
+		s.roots = append(s.roots, s.newRoot(r.Name, r.Dir, func(rt *root) { rt.gone.Store(true) }))
+	}
+	s.finish()
+	return s
+}
+
+func newBareServer(config Config, multi bool) *Server {
 	s := &Server{
 		config:       config,
 		mux:          http.NewServeMux(),
+		multi:        multi,
 		rootGone:     make(chan struct{}),
 		shutdownDone: make(chan struct{}),
 	}
@@ -72,24 +105,23 @@ func newServer(config Config, dirs ...string) *Server {
 		Addr:    fmt.Sprintf("%s:%d", config.Host, config.Port),
 		Handler: noCache(s.requireRoot(s.mux)),
 	}
-
-	for i, dir := range dirs {
-		var onRemoved func()
-		if i == 0 {
-			onRemoved = s.shutdownRootMissing
-		}
-		s.roots = append(s.roots, s.newRoot(dir, onRemoved))
-	}
-
-	s.templates = parseTemplates(s.hasLiveReload(), config.Version)
-	s.setupRoutes()
 	return s
 }
 
+// finish parses templates and routes once the roots exist.
+func (s *Server) finish() {
+	s.templates = parseTemplates(s.hasLiveReload(), s.config.Version)
+	s.setupRoutes()
+}
+
 // newRoot creates a root for dir with its own LiveReload when live reload is
-// enabled. onRemoved, if set, runs when dir itself is removed or renamed.
-func (s *Server) newRoot(dir string, onRemoved func()) *root {
-	rt := &root{dir: dir}
+// enabled. name is empty in single-root mode. onRemoved, if set, runs when dir
+// itself is removed or renamed.
+func (s *Server) newRoot(name, dir string, onRemoved func(*root)) *root {
+	rt := &root{name: name, dir: dir}
+	if name != "" {
+		rt.prefix = "/" + name
+	}
 	if !s.config.EnableLiveReload {
 		return rt
 	}
@@ -98,7 +130,9 @@ func (s *Server) newRoot(dir string, onRemoved func()) *root {
 		log.Printf("Failed to initialize LiveReload: %v", err)
 		return rt
 	}
-	lr.onRootRemoved = onRemoved
+	if onRemoved != nil {
+		lr.onRootRemoved = func() { onRemoved(rt) }
+	}
 	if err := lr.Start(); err != nil {
 		log.Printf("Failed to start LiveReload: %v", err)
 		return rt
@@ -117,9 +151,30 @@ func (s *Server) hasLiveReload() bool {
 	return false
 }
 
-// rootFor returns the root that serves r. With one root that is the only root.
-func (s *Server) rootFor(r *http.Request) *root {
-	return s.roots[0]
+// rootFor returns the root that serves r and the path of r inside it. In
+// single-root mode that is the only root and the full URL path. In multi-root
+// mode it is the root named by the first path segment and the remainder, and
+// ok is false when no root has that name.
+func (s *Server) rootFor(r *http.Request) (rt *root, inner string, ok bool) {
+	if !s.multi {
+		return s.roots[0], r.URL.Path, true
+	}
+	seg, rest, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, "/"), "/")
+	rt = s.rootNamed(seg)
+	if rt == nil {
+		return nil, "", false
+	}
+	return rt, "/" + rest, true
+}
+
+// rootNamed returns the multi-root root called name, or nil.
+func (s *Server) rootNamed(name string) *root {
+	for _, rt := range s.roots {
+		if rt.name == name {
+			return rt
+		}
+	}
+	return nil
 }
 
 // Start starts the HTTP server. It returns ErrRootMissing if the server shut
@@ -196,10 +251,10 @@ func (w noCacheWriter) Unwrap() http.ResponseWriter {
 
 // requireRoot answers every request with a shutdown notice once the root
 // directory is gone, then shuts the server down. It watches roots[0] only,
-// which is the single root.
+// which is the single root. Multi-root mode never shuts down this way.
 func (s *Server) requireRoot(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.roots[0].exists() {
+		if s.multi || s.roots[0].exists() {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -243,7 +298,9 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("/_mdserver/files", s.handleFiles)
 
 	// LiveReload WebSocket endpoint
-	if lr := s.roots[0].liveReload; lr != nil {
+	if s.multi {
+		s.mux.HandleFunc("/livereload", s.handleLiveReload)
+	} else if lr := s.roots[0].liveReload; lr != nil {
 		s.mux.HandleFunc("/livereload", lr.HandleWebSocket)
 	}
 
@@ -277,8 +334,27 @@ func (s *Server) servePickerJS(w http.ResponseWriter, r *http.Request) {
 
 // handleRequest serves paths under the root: directory listings, rendered Markdown and images.
 func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
-	rt := s.rootFor(r)
-	path, kind, status := rt.resolve(r.URL.Path)
+	if s.multi {
+		if r.URL.Path == "/" {
+			s.handleRoots(w, r)
+			return
+		}
+		// "/<name>" is the root's top level; send it to "/<name>/".
+		if name := strings.TrimPrefix(r.URL.Path, "/"); s.rootNamed(name) != nil {
+			http.Redirect(w, r, r.URL.Path+"/", http.StatusMovedPermanently)
+			return
+		}
+	}
+	rt, inner, ok := s.rootFor(r)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	if s.multi && !rt.available() {
+		serveRootMissing(w, rt)
+		return
+	}
+	path, kind, status := rt.resolve(inner)
 
 	switch status {
 	case http.StatusMovedPermanently:

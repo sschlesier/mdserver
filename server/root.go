@@ -7,14 +7,23 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 )
 
 // root is one served directory and the live reload that watches it. Server
 // finds files, lists directories and runs live reload through a root, so each
 // root's reloads stay with its own clients.
 type root struct {
-	dir        string
+	// name is the first URL segment in multi-root mode; empty in single-root mode.
+	name string
+	dir  string
+	// prefix is "/"+name in multi-root mode and empty in single-root mode. It
+	// goes in front of every URL the root hands out.
+	prefix     string
 	liveReload *LiveReload
+	// gone is set once the root's directory was seen missing in multi-root
+	// mode. The root then stays unavailable until restart.
+	gone atomic.Bool
 }
 
 // resolveKind says what a URL path resolved to under a root.

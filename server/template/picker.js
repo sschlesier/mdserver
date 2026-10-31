@@ -77,7 +77,9 @@
 
 	function search() {
 		var id = ++requestId;
-		fetch('/_mdserver/files?q=' + encodeURIComponent(input.value))
+		var root = document.body.getAttribute('data-root') || '';
+		var rootParam = root ? '&root=' + encodeURIComponent(root) : '';
+		fetch('/_mdserver/files?q=' + encodeURIComponent(input.value) + rootParam)
 			.then(function (res) {
 				if (!res.ok) throw new Error('HTTP ' + res.status);
 				return res.json();

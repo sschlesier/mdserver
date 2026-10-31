@@ -9,7 +9,7 @@
 	<link rel="apple-touch-icon" href="/favicon.ico">
 	<link rel="stylesheet" href="/_mdserver/style.css">
 </head>
-<body>
+<body{{if .HasRoot}} data-root=""{{end}}>
 	<div class="container">
 		<nav class="breadcrumbs">
 			<span class="breadcrumb-links">
@@ -26,6 +26,25 @@
 		{{if .LiveReloadEnabled}}
 		<div class="settings-section">
 			<h2>Watched Directories</h2>
+			{{if .Multi}}
+			{{range $group := .Groups}}
+			<h3 class="watched-root-name">{{$group.Name}}</h3>
+			<div class="watched-dirs-list">
+				{{range $group.Dirs}}
+				<div class="watched-dir-row">
+					<span class="watched-dir-path">{{.Display}}</span>
+					{{if .IsRoot}}<span class="root-badge">root</span>{{else}}
+					<form method="POST" action="/settings/remove-watch" style="display:inline;">
+						<input type="hidden" name="root" value="{{$group.Name}}">
+						<input type="hidden" name="dir" value="{{.Path}}">
+						<button type="submit" class="remove-watch-btn">Remove</button>
+					</form>
+					{{end}}
+				</div>
+				{{end}}
+			</div>
+			{{end}}
+			{{else}}
 			<div class="watched-dirs-list">
 				{{range .WatchedDirs}}
 				<div class="watched-dir-row">
@@ -39,6 +58,7 @@
 				</div>
 				{{end}}
 			</div>
+			{{end}}
 		</div>
 		{{end}}
 	</div>

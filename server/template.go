@@ -30,23 +30,27 @@ type templates struct {
 	page      *template.Template
 	directory *template.Template
 	settings  *template.Template
+	// roots is the multi-root landing page. It belongs to no root, so it never
+	// gets the live reload script.
+	roots *template.Template
 }
 
 // parseTemplates parses the embedded page templates, adding the live reload
 // client script when liveReload is set. Pages show version in the header.
 func parseTemplates(liveReload bool, version string) templates {
-	parse := func(name string) *template.Template {
+	parse := func(name string, withLiveReload bool) *template.Template {
 		src := string(mustReadTemplateFile(name + ".html"))
-		if liveReload {
+		if withLiveReload {
 			src = injectLiveReloadScript(src)
 		}
 		funcs := template.FuncMap{"version": func() string { return version }}
 		return template.Must(template.New(name).Funcs(funcs).Parse(src))
 	}
 	return templates{
-		page:      parse("page"),
-		directory: parse("directory"),
-		settings:  parse("settings"),
+		page:      parse("page", liveReload),
+		directory: parse("directory", liveReload),
+		settings:  parse("settings", liveReload),
+		roots:     parse("roots", false),
 	}
 }
 
