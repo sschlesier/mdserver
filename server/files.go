@@ -19,7 +19,7 @@ var maxWalkEntries = 50000
 // pageFiles lists the root-relative, slash-separated paths of every page file under
 // the root, skipping dot segments and following symlinks. The walk stops after
 // maxWalkEntries entries and returns what it found.
-func (s *Server) pageFiles() []string {
+func (rt *root) pageFiles() []string {
 	var files []string
 	visited := 0
 	inProgress := map[string]bool{}
@@ -64,7 +64,7 @@ func (s *Server) pageFiles() []string {
 			}
 		}
 	}
-	walk(s.config.RootDir, "")
+	walk(rt.dir, "")
 	return files
 }
 
@@ -85,7 +85,7 @@ func (s *Server) handleFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	matches := matchFiles(r.URL.Query().Get("q"), s.pageFiles(), maxPickerResults)
+	matches := matchFiles(r.URL.Query().Get("q"), s.rootFor(r).pageFiles(), maxPickerResults)
 	results := make([]fileResult, len(matches))
 	for i, m := range matches {
 		results[i] = fileResult{Path: m.Path, Href: pageHref(m.Path), Matches: m.Matches}

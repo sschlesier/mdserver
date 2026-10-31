@@ -466,7 +466,7 @@ func TestStartWaitsForInFlightRequestOnRootMissing(t *testing.T) {
 func assertLiveReloadStopped(t *testing.T, srv *Server) {
 	t.Helper()
 	select {
-	case <-srv.liveReload.stopChan:
+	case <-srv.roots[0].liveReload.stopChan:
 	default:
 		t.Error("Expected live reload to be stopped")
 	}
@@ -474,7 +474,7 @@ func assertLiveReloadStopped(t *testing.T, srv *Server) {
 
 func TestStopTwiceSequentially(t *testing.T) {
 	srv := NewServer(Config{Host: "localhost", RootDir: t.TempDir(), EnableLiveReload: true})
-	if srv.liveReload == nil {
+	if srv.roots[0].liveReload == nil {
 		t.Fatal("Expected live reload to be enabled")
 	}
 
@@ -485,7 +485,7 @@ func TestStopTwiceSequentially(t *testing.T) {
 
 func TestStopConcurrently(t *testing.T) {
 	srv := NewServer(Config{Host: "localhost", RootDir: t.TempDir(), EnableLiveReload: true})
-	if srv.liveReload == nil {
+	if srv.roots[0].liveReload == nil {
 		t.Fatal("Expected live reload to be enabled")
 	}
 
