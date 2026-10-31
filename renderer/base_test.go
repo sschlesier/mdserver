@@ -30,6 +30,7 @@ func TestRenderMarkdownWithBase(t *testing.T) {
 		{"block quote", "> [x](/a.md)", []string{`href="/notes/a.md"`}, nil},
 		{"autolink", "https://example.com/x", []string{`href="https://example.com/x"`}, []string{"/notes"}},
 		{"angle autolink", "<https://example.com/x>", []string{`href="https://example.com/x"`}, []string{"/notes"}},
+		{"bare path is not a link", "see /a.md and www.example.com/x", []string{"see /a.md", `href="http://www.example.com/x"`}, []string{"/notes"}},
 		{"code span", "`[x](/a.md)`", []string{"[x](/a.md)"}, []string{"/notes"}},
 		{"fenced code", "```\n[x](/a.md)\n```\n", []string{"[x](/a.md)"}, []string{"/notes"}},
 		{"mermaid", "```mermaid\ngraph TD; A-->B;\n```\n[x](/a.md)", []string{`<div class="mermaid">graph TD; A--&gt;B;</div>`, `href="/notes/a.md"`}, []string{"<pre>"}},
