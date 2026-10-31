@@ -193,3 +193,15 @@ func TestRootsResolveStayInsideTheirRoot(t *testing.T) {
 		t.Errorf("symlinked page resolved to %q, want a file under %q", real, realOutside)
 	}
 }
+
+func TestStopStopsEveryRoot(t *testing.T) {
+	srv := newServerWithRoots(t, Config{Host: "localhost", EnableLiveReload: true}, t.TempDir(), t.TempDir())
+	srv.Stop()
+	for i, rt := range srv.roots {
+		select {
+		case <-rt.liveReload.stopChan:
+		default:
+			t.Errorf("root %d live reload was not stopped", i)
+		}
+	}
+}
