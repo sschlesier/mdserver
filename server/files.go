@@ -85,10 +85,19 @@ func (s *Server) handleFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	matches := matchFiles(r.URL.Query().Get("q"), s.roots[0].pageFiles(), maxPickerResults)
+	// Multi-root requests name their root; single-root requests ignore the parameter.
+	rt := s.roots[0]
+	if s.multi {
+		if rt = s.rootNamed(r.URL.Query().Get("root")); rt == nil {
+			http.NotFound(w, r)
+			return
+		}
+	}
+
+	matches := matchFiles(r.URL.Query().Get("q"), rt.pageFiles(), maxPickerResults)
 	results := make([]fileResult, len(matches))
 	for i, m := range matches {
-		results[i] = fileResult{Path: m.Path, Href: pageHref(m.Path), Matches: m.Matches}
+		results[i] = fileResult{Path: m.Path, Href: rt.prefix + pageHref(m.Path), Matches: m.Matches}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -39,8 +39,8 @@ func (s *Server) handleMarkdown(w http.ResponseWriter, r *http.Request, rt *root
 		return
 	}
 
-	// Render markdown to HTML
-	htmlContent, err := renderer.RenderMarkdown(content)
+	// Render markdown to HTML; root-relative links stay inside the root's prefix.
+	htmlContent, err := renderer.RenderMarkdownWithBase(content, rt.prefix)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to render markdown: %v", err), http.StatusInternalServerError)
 		return
@@ -56,7 +56,7 @@ func (s *Server) handleMarkdown(w http.ResponseWriter, r *http.Request, rt *root
 	}
 
 	// Generate breadcrumbs
-	breadcrumbs := createBreadcrumbs(relPath)
+	breadcrumbs := rt.breadcrumbs(relPath)
 
 	tmpl := s.templates.page
 
@@ -64,10 +64,12 @@ func (s *Server) handleMarkdown(w http.ResponseWriter, r *http.Request, rt *root
 		Title       string
 		Content     template.HTML
 		Breadcrumbs []Breadcrumb
+		Root        string
 	}{
 		Title:       title,
 		Content:     template.HTML(htmlContent),
 		Breadcrumbs: breadcrumbs,
+		Root:        rt.name,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -110,7 +112,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, rt *root, d
 	}
 
 	// Generate breadcrumbs
-	breadcrumbs := createBreadcrumbs(relPath)
+	breadcrumbs := rt.breadcrumbs(relPath)
 
 	// Build list of entries
 	var dirEntries []DirectoryEntry
@@ -151,7 +153,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, rt *root, d
 		for i, part := range parts {
 			encodedParts[i] = url.PathEscape(part)
 		}
-		urlPath := "/" + strings.Join(encodedParts, "/")
+		urlPath := rt.prefix + "/" + strings.Join(encodedParts, "/")
 		if entry.IsDir() {
 			urlPath += "/"
 		}
@@ -181,9 +183,9 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, rt *root, d
 			}
 			var parentURLPath string
 			if len(encodedParts) == 0 {
-				parentURLPath = "/"
+				parentURLPath = rt.prefix + "/"
 			} else {
-				parentURLPath = "/" + strings.Join(encodedParts, "/") + "/"
+				parentURLPath = rt.prefix + "/" + strings.Join(encodedParts, "/") + "/"
 			}
 
 			// Prepend parent directory entry
@@ -195,6 +197,9 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, rt *root, d
 			}
 			dirEntries = append([]DirectoryEntry{parentEntry}, dirEntries...)
 		}
+	} else if s.multi {
+		// A root's top level links back to the list of roots.
+		dirEntries = append([]DirectoryEntry{{Name: "..", Path: "/", IsDir: true}}, dirEntries...)
 	}
 
 	tmpl := s.templates.directory
@@ -209,10 +214,12 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, rt *root, d
 		Title       string
 		Breadcrumbs []Breadcrumb
 		Entries     []DirectoryEntry
+		Root        string
 	}{
 		Title:       title,
 		Breadcrumbs: breadcrumbs,
 		Entries:     dirEntries,
+		Root:        rt.name,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -273,11 +280,13 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		Breadcrumbs        []Breadcrumb
 		WatchedDirs        []WatchedDir
 		LiveReloadEnabled  bool
+		HasRoot            bool
 	}{
 		Title:             "Settings",
 		Breadcrumbs:       breadcrumbs,
 		WatchedDirs:       watchedDirs,
 		LiveReloadEnabled: liveReloadEnabled,
+		HasRoot:           !s.multi,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -359,8 +368,21 @@ func trimMarkdownExt(name string) string {
 // relPath should be relative to the root directory (e.g., "docs/subdir" or "docs/subdir/file.md")
 // For markdown files, it generates breadcrumbs for the containing directory and includes the filename
 func createBreadcrumbs(relPath string) []Breadcrumb {
-	crumbs := []Breadcrumb{
-		{Href: "/", Text: template.HTML(`<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="vertical-align: middle; display: inline-block;"><path d="M8 0L0 7h2v9h5v-6h2v6h5V7h2L8 0z"/></svg>/`)},
+	return createPrefixedBreadcrumbs("", "", relPath)
+}
+
+// breadcrumbs returns the breadcrumbs for relPath, a path relative to this root.
+func (rt *root) breadcrumbs(relPath string) []Breadcrumb {
+	return createPrefixedBreadcrumbs(rt.name, rt.prefix, relPath)
+}
+
+// createPrefixedBreadcrumbs is createBreadcrumbs for a root served under
+// prefix ("/<name>", or empty in single-root mode). With a prefix the home icon
+// links to /, then comes the root's own "<name>/" crumb, then the path.
+func createPrefixedBreadcrumbs(name, prefix, relPath string) []Breadcrumb {
+	crumbs := []Breadcrumb{homeBreadcrumb}
+	if prefix != "" {
+		crumbs = append(crumbs, Breadcrumb{Href: prefix + "/", Text: template.HTML(template.HTMLEscapeString(name) + "/")})
 	}
 
 	// If path is empty or just ".", return root breadcrumb only
@@ -389,7 +411,7 @@ func createBreadcrumbs(relPath string) []Breadcrumb {
 	if dirPath != "" && dirPath != "." {
 		// Split path into segments
 		parts := strings.Split(dirPath, "/")
-		collectPath := "/"
+		collectPath := prefix + "/"
 
 		// Create breadcrumb for each directory segment
 		for _, part := range parts {
@@ -421,7 +443,7 @@ func createBreadcrumbs(relPath string) []Breadcrumb {
 		for i, part := range parts {
 			encodedParts[i] = url.PathEscape(part)
 		}
-		fileURL := "/" + strings.Join(encodedParts, "/")
+		fileURL := prefix + "/" + strings.Join(encodedParts, "/")
 
 		crumbs = append(crumbs, Breadcrumb{
 			Href: fileURL,
@@ -436,10 +458,17 @@ func createBreadcrumbs(relPath string) []Breadcrumb {
 func injectLiveReloadScript(html string) string {
 	script := `<script>
 (function() {
+	// data-root names the root this page belongs to; it is empty in single-root
+	// mode and absent on pages that belong to no root.
+	var root = document.body.getAttribute('data-root');
+	if (root === null) {
+		return;
+	}
 	function connect() {
 		var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 		var host = window.location.host;
-		var ws = new WebSocket(protocol + '//' + host + '/livereload');
+		var query = root ? '?root=' + encodeURIComponent(root) : '';
+		var ws = new WebSocket(protocol + '//' + host + '/livereload' + query);
 
 		ws.onmessage = function(event) {
 			if (event.data === 'reload') {
