@@ -6,7 +6,7 @@ priority: 2
 depends-on: [refactor-the-server-around-a-registry-of-roots, rewrite-root-relative-markdown-links-under-a-url-prefix]
 parent:
 approved: "Scott Schlesier, 2026-10-31: Spec 2 of 3: --multi-root with line-format config, zero roots invalid, footgun list incl. /private/var and /private/etc, accepted-risk rewording via PR. Cold read: no behaviour gaps; verdict blocked only on unbuilt prerequisites; spec issues folded in"
-status: in-review
+status: done
 ---
 
 A user can run `mdserver --multi-root [config]` to serve several named root directories from one port, each at `/<name>/`, with the roots read once at startup from a plain-text config file; running mdserver without `--multi-root` is unchanged.
@@ -39,7 +39,7 @@ Out of scope:
 - [x] In multi-root mode, a page rendered under `/<name>/` is rendered with the prefix `/<name>`, so a root-relative link or image in it (`[x](/sub/b.md)`, `![](/i.png)`) points to `/<name>/sub/b.md` and `/<name>/i.png`; relative and absolute URLs are unchanged. In single-root mode pages are rendered with no prefix, as today.
 - [x] Directory-listing links and breadcrumbs in multi-root mode carry the prefix: breadcrumbs are home icon → `/`, then `<name>/`, then subdirectories, then the file; the `..` entry at a root's top level links to `/`.
 - [x] Live reload is per root: with two roots A and B served and a tab open on each, saving a `.md` file in A reloads the tab on A and does not reload the tab on B, and the reverse.
-- [ ] The Alt-O file picker searches only the current page's root, and each result opens the right file under that root's prefix.
+- [x] The Alt-O file picker searches only the current page's root, and each result opens the right file under that root's prefix.
 - [x] The settings page, in multi-root mode, groups watched directories under their root's name. Remove-watch removes only a directory of the named root, and a root's top-level watch cannot be removed. Shutdown stops the whole server.
 - [x] If a root's directory disappears while the server runs, requests under its prefix return 410 with a "Folder missing" page naming it, its entry on `/` is marked unavailable, and the other roots keep serving. The server does not shut down in multi-root mode, even if every root becomes unavailable. The root stays unavailable until restart.
 - [x] The README, `--help` text and CHANGES.md describe `--multi-root`, the config format and the default location; CLAUDE.md's Review profile invariants (the bullet list under `Invariants:` only, not the Purpose, Data or accepted-risk text) say "configured root" where they say "served root" (the accepted-risk text is not edited by this work; see Boundaries).
@@ -100,3 +100,5 @@ Don't touch: the accepted-risk entries and their "valid while" lines in CLAUDE.m
 - 2026-10-31: Assumption: criterion 16 left unticked - picker.js and the live reload client script are not exercised in a real browser, only their server side; criterion 17 shutdown is the unchanged global handler, untested. Manual step 5: Go mux answers /a/../b/x.md with 307 to /b/x.md, not 301; never 200.
 - 2026-10-31: Status: in-review
 - 2026-10-31: Review round 1 triage: fixed explicit --port 0 beating config port; added tests for subdirectory .. prefix and watcher-only gone flag. Dismissed: equivalent mutants (port in reserved map, /private/var on macOS), remove-watch with trailing-slash dir (RemoveWatch matches exact key), untested browser-open URL/noOpen branches. Escalated: picker.js and live reload client root= query have no browser test.
+- 2026-10-31: Review round 1 answers (Scott Schlesier): accepted the risk that picker.js and the live reload client JS were not run in a browser; keep '<file>:0: no roots defined' for zero roots; agreed the 307-vs-301 clearing was right.
+- 2026-10-31: Status: done: Reviewed round 1: all 19 criteria met; criterion 16's client JS (picker.js, live reload) not run in a browser, risk accepted by Scott Schlesier
