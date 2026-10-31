@@ -6,7 +6,7 @@ priority: 2
 depends-on: []
 parent:
 approved: "Scott Schlesier, 2026-10-31: Spec 1 of 3 (root registry refactor, no behaviour change): Config.RootDir kept, test-only two-root constructor, per-root LiveReload; response-diff verification. Cold read: pass"
-status: in-review
+status: done
 ---
 
 The server resolves files and runs live reload through a per-root object held in a registry, so a later change can add more roots; mdserver's behavior with one root is unchanged for users.
@@ -81,3 +81,5 @@ Don't touch: `renderer/`, `main.go` flags, `server/template/`, `.github/`.
 - 2026-10-31: Review round 1 triage: added tests for the 301 directory redirect, Stop on every root, EnsureWatching from handleIndex/handleMarkdown, and remove-watch (surviving mutants, all now killed). Dismissed: mutant '!HasSuffix(requestPath,/)' -> true is equivalent (requestPath and urlPath share the suffix); relPath 'outside returns original' only changes log text; code-review style notes on Abs/Rel repetition in contains/isValidPath/isHiddenPath, the newServerShell+finish constructor split, and resolve returning kind plus status are cosmetic; its nil-liveReload guess is wrong (handleSettings and handleRemoveWatch guard it).
 - 2026-10-31: Review round 1, pass 1 rerun: no new fixes. Dismissed: LiveReload watcher not stopped when Start fails in newRoot (same as before the refactor, out of scope); rootFor indexes roots[0] and would panic with zero roots (production always has one); resolve's urlPath==/ shortcut is an equivalent mutant (Join(dir,"") is dir) and is kept; resolve returns kindPage for a missing page and handleMarkdown 404s it (as before, responses identical).
 - 2026-10-31: Verification step 4 done from the shell per the reviewer: served a dir, held a real WebSocket on /livereload, edited the .md with a shell write, got 'reload' immediately; baseline binary and PR head (19f28c5) identical, and the served page includes the /livereload script on both.
+- 2026-10-31: Review round 1 decisions (Scott): (1) one private constructor newServer(config, dirs...) replaces the shell+finish split; NewServer and the test helper both call it. (2) root.dir stays Config.RootDir as given instead of being made absolute: mdserver is a CLI not a library, main.go already passes an absolute path, and KISS wins over the Design wording 'absolute directory' (deliberate deviation, Design text not amended). (3) The 403 guard in root.resolve stays: nothing may traverse outside a root dir. (4) Not rerun: the full cold verify after (1); instead go vet/test/-race, the 23-path style response diff, the shell WebSocket reload check and the missing-root check were rerun and match the baseline.
+- 2026-10-31: Status: done: Reviewed round 1: all 8 criteria verified; step 4 checked from the shell; decisions on constructor, root dir and the 403 guard recorded in the Log
