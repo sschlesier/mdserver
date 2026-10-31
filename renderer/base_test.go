@@ -87,3 +87,18 @@ func TestRenderMarkdownWithBaseDistinctBases(t *testing.T) {
 		t.Errorf("bases mixed up: %s / %s", a, b)
 	}
 }
+
+func TestRenderMarkdownWithBaseOnlyChangesDestinations(t *testing.T) {
+	got, err := RenderMarkdownWithBase([]byte(goldenDoc), "/x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(got)
+	if s == goldenHTML {
+		t.Fatal("base had no effect")
+	}
+	s = strings.NewReplacer(`href="/x/`, `href="/`, `src="/x/`, `src="/`).Replace(s)
+	if s != goldenHTML {
+		t.Errorf("output differs from unprefixed output beyond destinations:\n%s", s)
+	}
+}
