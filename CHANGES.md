@@ -4,6 +4,7 @@
 
 - Add `--multi-root [config]` to serve several named roots from one port, each at `/<name>/`. The roots are read once at startup from a plain-text config file (`$XDG_CONFIG_HOME/mdserver/roots`, else `~/.config/mdserver/roots`, or the path given); each line is `<name> <path>`, with an optional `port <n>` line. `/` lists the roots
 - In multi-root mode root-relative Markdown links and images point inside their root, live reload, the file picker and remove-watch work per root, and a root whose folder disappears answers 410 while the others keep serving. Single-root mode (no `--multi-root`) is unchanged
+- In multi-root mode, reload the config file when it changes: roots are added, removed or repointed within about a second without a restart, and an invalid edit keeps the working roots and shows the error on `/`. A changed `port` line only raises a notice. A root whose folder returned after vanishing is served again on the next request instead of staying unavailable until restart
 
 ## v3.1.0
 
