@@ -6,7 +6,7 @@ priority: 2
 depends-on: [serve-several-roots-from-one-port-with-multi-root]
 parent:
 approved: "Scott Schlesier, 2026-10-31: Spec 3 of 3: live config reload, all-or-nothing, vanished root revived on request. Cold read: no behaviour gaps; verdict blocked only on unbuilt prerequisites; spec issues folded in"
-status: in-review
+status: done
 ---
 
 When a user edits the multi-root config file while `mdserver --multi-root` is running, the roots served change within about a second without a restart, and a mistake in the edit never takes down roots that were working.
@@ -89,3 +89,5 @@ Don't touch: the config grammar and validation rules from spec 2 (reuse them as 
 - 2026-10-31: Status: in-review: Implemented on reload-multi-root-config; go test -race, vet, build pass
 - 2026-10-31: Review round 1 triage: added tests for stop-on-revive, picker revival, revive branches, unrelated-file filter and serialised reloads; dismissed WatchConfig/Errors-branch coverage as low value and the first-pass sameRootDir mutant as equivalent (unused fresh roots are never created for kept names)
 - 2026-10-31: Review round 1 triage 2: added tests for re-logging after clear, unreadable config and leak-free concurrent reloads (mutants for loggedErr and reloadMu now killed); dismissed the watch-unresolved-dir mutant as platform-equivalent on macOS kqueue (events for a symlinked file arrive under the target path), runMultiRoot wiring left untested, applyRoots re-read of cur untested; escalated: WatchConfig failure handling, port notice vs --port, watched directory deleted
+- 2026-10-31: Review round 1 decisions (Scott): WatchConfig failure keeps serving and logs only; watched-directory deletion accepted as a risk; manual verification steps 1-7 waived and unrun; transient zero-roots banner clearing confirmed
+- 2026-10-31: Status: done: Reviewed round 1: all 11 criteria verified by tests; manual steps waived by Scott
