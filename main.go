@@ -34,10 +34,12 @@ func main() {
 		showVersion = flag.Bool("version", false, "Show version information")
 		render      = flag.Bool("render", false, "Render markdown to HTML and output to stdout")
 		noOpen      = flag.Bool("no-open", false, "Don't open browser on startup")
+		multiRoot   = flag.Bool("multi-root", false, "Serve several named roots from one port, read from a config file (the optional [config] argument; default $XDG_CONFIG_HOME/mdserver/roots or ~/.config/mdserver/roots)")
 	)
 	flag.BoolVar(render, "r", false, "Render markdown to HTML and output to stdout (shorthand)")
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: mdserver [flags] [file]\n\nFlags:\n")
+		fmt.Fprintf(os.Stderr, "Usage: mdserver [flags] [file]\n       mdserver --multi-root [flags] [config]\n\n")
+		fmt.Fprintf(os.Stderr, "With --multi-root, each line of the config file is \"<name> <path>\" and is served at /<name>/;\n\"port <n>\" sets the port; blank lines and lines starting with # are ignored.\n\nFlags:\n")
 		flag.VisitAll(func(f *flag.Flag) {
 			prefix := "--"
 			if len(f.Name) == 1 {
@@ -58,6 +60,18 @@ func main() {
 		fmt.Printf("Commit: %s\n", commit)
 		fmt.Printf("Built: %s\n", date)
 		os.Exit(0)
+	}
+
+	setFlags := map[string]bool{}
+	flag.Visit(func(f *flag.Flag) { setFlags[f.Name] = true })
+	if *multiRoot {
+		if conflict := multiRootConflict(setFlags, *render); conflict != "" {
+			fmt.Fprintf(os.Stderr, "Error: --multi-root cannot be used with %s\n", conflict)
+			flag.Usage()
+			os.Exit(2)
+		}
+		runMultiRoot(*host, *port, *livereload, *verbose, *noOpen, flag.Arg(0))
+		return
 	}
 
 	// Handle render mode
