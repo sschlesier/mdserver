@@ -89,6 +89,18 @@ func TestRenderMarkdownWithBaseDistinctBases(t *testing.T) {
 	}
 }
 
+func TestRenderMarkdownKeepsHardWraps(t *testing.T) {
+	for _, base := range []string{"", "/x"} {
+		got, err := RenderMarkdownWithBase([]byte("line one\nline two"), base)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := "<p>line one<br />\nline two</p>\n"; string(got) != want {
+			t.Errorf("base %q: got %q, want %q", base, got, want)
+		}
+	}
+}
+
 func TestRenderMarkdownWithBaseOnlyChangesDestinations(t *testing.T) {
 	got, err := RenderMarkdownWithBase([]byte(goldenDoc), "/x")
 	if err != nil {
