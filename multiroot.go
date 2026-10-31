@@ -66,6 +66,10 @@ func runMultiRoot(host string, flagPort int, flagPortGiven, liveReload, verbose,
 		Version:          version,
 	})
 
+	if err := srv.WatchConfig(path, cfg.Port); err != nil {
+		log.Printf("Config changes will not be reloaded: %v", err)
+	}
+
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	go func() {

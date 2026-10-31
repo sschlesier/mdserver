@@ -21,6 +21,8 @@
 			</a>
 		</nav>
 		<h1>{{.Title}}</h1>
+		{{with .Error}}<div class="config-banner config-error" role="alert">{{.}}</div>{{end}}
+		{{with .Notice}}<div class="config-banner config-notice">{{.}}</div>{{end}}
 		<ul class="directory-listing">
 			{{range .Roots}}
 			<li class="directory">

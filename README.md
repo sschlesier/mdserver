@@ -40,7 +40,7 @@ mdserver --multi-root [config]
 
 `mdserver --multi-root [config]` serves several named directories from one port, each at `/<name>/`. Without `--multi-root`, mdserver serves one directory at `/` exactly as before; no config file is ever read.
 
-The roots come from a plain-text config file, read once at startup. `config` is optional; the default is `$XDG_CONFIG_HOME/mdserver/roots` when `XDG_CONFIG_HOME` is set and that file exists, otherwise `~/.config/mdserver/roots` (on macOS too). If the file doesn't exist, mdserver exits with status 1 and lists the paths it looked at.
+The roots come from a plain-text config file, read at startup and again whenever the file changes (see "Editing the config while running"). `config` is optional; the default is `$XDG_CONFIG_HOME/mdserver/roots` when `XDG_CONFIG_HOME` is set and that file exists, otherwise `~/.config/mdserver/roots` (on macOS too). If the file doesn't exist, mdserver exits with status 1 and lists the paths it looked at.
 
 ```text
 # Blank lines and lines starting with # are ignored.
@@ -55,7 +55,13 @@ work  /Users/me/src/project/docs
 - An invalid line, or a file with no roots, stops mdserver with status 1 and a message `<file>:<line>: <reason>`.
 - `--multi-root` can't be combined with `--dir`, `--file` or `--render`.
 
-`/` lists the roots. `/<name>/` is that root's directory listing, and root-relative links in its Markdown (`[x](/sub/page.md)`) point inside the root (`/<name>/sub/page.md`). Live reload, the `Alt+O` file search and the settings page work per root. If a root's folder disappears, its pages answer 410 "Folder missing" until mdserver is restarted; the other roots keep serving.
+`/` lists the roots. `/<name>/` is that root's directory listing, and root-relative links in its Markdown (`[x](/sub/page.md)`) point inside the root (`/<name>/sub/page.md`). Live reload, the `Alt+O` file search and the settings page work per root. If a root's folder disappears, its pages answer 410 "Folder missing" and the other roots keep serving; when the folder is back, the next request under that root serves it again.
+
+### Editing the config while running
+
+Save the config file and the roots change within about a second, with no restart. Added roots appear, removed roots return 404 and stop live reload, and a root with a new path serves the new directory. Roots whose name and directory are unchanged keep their open tabs. Both in-place saves and write-then-rename saves are picked up.
+
+The reload is all or nothing. If the edited file is invalid in any way that stops startup (including having no roots), nothing changes: the current roots keep serving, `/` shows the `<file>:<line>: <reason>` message and the log records it once. The banner clears after the next valid save. The same holds if the file is deleted or briefly missing. A changed `port` line is ignored, and `/` says "port change needs a restart".
 
 ## Features
 

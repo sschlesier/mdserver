@@ -35,6 +35,61 @@ func (rt *root) available() bool {
 	return true
 }
 
+// availableRoot reports whether rt can serve and returns the root to serve
+// from. A root whose directory is back is replaced by a fresh one (new
+// watchers and sockets) first. This runs only when a request asks, never on a
+// timer.
+func (s *Server) availableRoot(rt *root) (*root, bool) {
+	if rt.available() {
+		return rt, true
+	}
+	if !rt.exists() {
+		return rt, false
+	}
+	nr := s.reviveRoot(rt)
+	if nr == nil {
+		return rt, false
+	}
+	return nr, true
+}
+
+// reviveRoot swaps a fresh root for old in the root set, or returns the root
+// already serving old's name when another request revived it first. It returns
+// nil when the name has left the set or the server has stopped.
+func (s *Server) reviveRoot(old *root) *root {
+	s.rootsMu.Lock()
+	if s.stopped {
+		s.rootsMu.Unlock()
+		return nil
+	}
+	idx := -1
+	for i, rt := range s.roots {
+		if rt.name == old.name {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		s.rootsMu.Unlock()
+		return nil
+	}
+	if cur := s.roots[idx]; cur != old {
+		s.rootsMu.Unlock()
+		return cur
+	}
+	nr := s.newMultiRoot(old.name, old.dir)
+	next := append([]*root(nil), s.roots...)
+	next[idx] = nr
+	s.roots = next
+	s.rootsMu.Unlock()
+
+	if old.liveReload != nil {
+		old.liveReload.Stop()
+	}
+	log.Printf("Root %s is back: %s", old.name, old.dir)
+	return nr
+}
+
 // serveRootMissing answers a request under an unavailable root with 410.
 func serveRootMissing(w http.ResponseWriter, rt *root) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -45,8 +100,9 @@ func serveRootMissing(w http.ResponseWriter, rt *root) {
 
 // handleRoots serves the multi-root landing page: every root, in config order.
 func (s *Server) handleRoots(w http.ResponseWriter, r *http.Request) {
-	entries := make([]RootEntry, len(s.roots))
-	for i, rt := range s.roots {
+	roots := s.rootList()
+	entries := make([]RootEntry, len(roots))
+	for i, rt := range roots {
 		entries[i] = RootEntry{
 			Name:        rt.name,
 			Href:        rt.prefix + "/",
@@ -54,14 +110,19 @@ func (s *Server) handleRoots(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	errMsg, notice := s.configState()
 	data := struct {
 		Title       string
 		Breadcrumbs []Breadcrumb
 		Roots       []RootEntry
+		Error       string
+		Notice      string
 	}{
 		Title:       "Roots",
 		Breadcrumbs: []Breadcrumb{homeBreadcrumb},
 		Roots:       entries,
+		Error:       errMsg,
+		Notice:      notice,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
