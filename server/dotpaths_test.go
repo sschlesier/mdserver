@@ -97,26 +97,26 @@ func TestOutsideRootPathsStayForbidden(t *testing.T) {
 
 	for _, rel := range []string{"../x", "../x.md", "../.env", "../../etc/passwd"} {
 		p := filepath.Join(root, rel)
-		if s.isValidPath(p) {
+		if s.roots[0].isValidPath(p) {
 			t.Errorf("isValidPath(%q) = true, want false", rel)
 		}
-		if s.isHiddenPath(p) {
+		if s.roots[0].isHiddenPath(p) {
 			t.Errorf("isHiddenPath(%q) = true, want false (outside root keeps 403)", rel)
 		}
 	}
 
 	for name, p := range map[string]string{"root": root, "root parent": filepath.Join(root, "..")} {
-		if s.isValidPath(p) {
+		if s.roots[0].isValidPath(p) {
 			t.Errorf("isValidPath(%s) = true, want false", name)
 		}
 	}
 
 	// A name that merely starts with ".." is a dot segment inside the root.
 	p := filepath.Join(root, "..foo")
-	if !s.isHiddenPath(p) {
+	if !s.roots[0].isHiddenPath(p) {
 		t.Errorf("isHiddenPath(..foo) = false, want true")
 	}
-	if s.isValidPath(p) {
+	if s.roots[0].isValidPath(p) {
 		t.Errorf("isValidPath(..foo) = true, want false")
 	}
 }

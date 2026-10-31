@@ -54,7 +54,7 @@ func TestLiveReloadIntegration(t *testing.T) {
 	}
 
 	srv := NewServer(config)
-	if srv.liveReload == nil {
+	if srv.roots[0].liveReload == nil {
 		t.Fatal("LiveReload was not initialized")
 	}
 
@@ -177,7 +177,7 @@ func TestEnsureWatchingDeepDirectory(t *testing.T) {
 	}
 
 	srv := NewServer(config)
-	if srv.liveReload == nil {
+	if srv.roots[0].liveReload == nil {
 		t.Fatal("LiveReload was not initialized")
 	}
 
@@ -217,7 +217,7 @@ func TestEnsureWatchingDeepDirectory(t *testing.T) {
 	time.Sleep(300 * time.Millisecond)
 
 	// Now call EnsureWatching on the deep directory
-	srv.liveReload.EnsureWatching(deepDir)
+	srv.roots[0].liveReload.EnsureWatching(deepDir)
 
 	// Wait for watcher to settle
 	time.Sleep(100 * time.Millisecond)
@@ -267,7 +267,7 @@ func TestLiveReloadMultipleClients(t *testing.T) {
 	}
 
 	srv := NewServer(config)
-	if srv.liveReload == nil {
+	if srv.roots[0].liveReload == nil {
 		t.Fatal("LiveReload was not initialized")
 	}
 
@@ -387,7 +387,7 @@ func TestLiveReloadAtomicSaveRename(t *testing.T) {
 	}
 
 	srv := NewServer(config)
-	if srv.liveReload == nil {
+	if srv.roots[0].liveReload == nil {
 		t.Fatal("LiveReload was not initialized")
 	}
 
@@ -475,9 +475,9 @@ func TestLiveReloadClientSurvivesBroadcastsAfterWriteTimeout(t *testing.T) {
 
 	for i := 0; i < 2; i++ {
 		if i > 0 {
-			time.Sleep(3 * srv.liveReload.writeTimeout)
+			time.Sleep(3 * srv.roots[0].liveReload.writeTimeout)
 		}
-		srv.liveReload.broadcast <- []byte("reload")
+		srv.roots[0].liveReload.broadcast <- []byte("reload")
 		conn.SetReadDeadline(time.Now().Add(time.Second))
 		if _, msg, err := conn.ReadMessage(); err != nil || string(msg) != "reload" {
 			t.Fatalf("Broadcast %d: expected reload, got %q, err %v", i+1, msg, err)
@@ -513,16 +513,16 @@ func startStuckLiveReloadClient(t *testing.T, writeTimeout time.Duration) *Serve
 
 	payload := make([]byte, 1<<20)
 	for i := 0; i < 64; i++ {
-		srv.liveReload.broadcast <- payload
+		srv.roots[0].liveReload.broadcast <- payload
 	}
 	time.Sleep(50 * time.Millisecond)
 	return srv
 }
 
 func liveReloadClientCount(srv *Server) int {
-	srv.liveReload.clientsMu.RLock()
-	defer srv.liveReload.clientsMu.RUnlock()
-	return len(srv.liveReload.clients)
+	srv.roots[0].liveReload.clientsMu.RLock()
+	defer srv.roots[0].liveReload.clientsMu.RUnlock()
+	return len(srv.roots[0].liveReload.clients)
 }
 
 func TestStuckLiveReloadClientIsDropped(t *testing.T) {
@@ -550,7 +550,7 @@ func TestStopWithStuckLiveReloadClient(t *testing.T) {
 	}()
 	select {
 	case <-stopped:
-	case <-time.After(srv.liveReload.writeTimeout + time.Second):
+	case <-time.After(srv.roots[0].liveReload.writeTimeout + time.Second):
 		t.Fatal("Stop blocked behind a live-reload client that stopped reading")
 	}
 }

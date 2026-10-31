@@ -23,10 +23,10 @@ type Breadcrumb struct {
 }
 
 // handleMarkdown serves a markdown file as HTML
-func (s *Server) handleMarkdown(w http.ResponseWriter, r *http.Request, filePath string) {
-	log.Printf("markdown: %s", s.relPath(filePath))
-	if s.liveReload != nil {
-		s.liveReload.EnsureWatching(filepath.Dir(filePath))
+func (s *Server) handleMarkdown(w http.ResponseWriter, r *http.Request, rt *root, filePath string) {
+	log.Printf("markdown: %s", rt.relPath(filePath))
+	if rt.liveReload != nil {
+		rt.liveReload.EnsureWatching(filepath.Dir(filePath))
 	}
 	// Read markdown file
 	content, err := os.ReadFile(filePath)
@@ -50,7 +50,7 @@ func (s *Server) handleMarkdown(w http.ResponseWriter, r *http.Request, filePath
 	title := extractTitle(string(content), filepath.Base(filePath))
 
 	// Calculate relative path from root directory for breadcrumbs
-	relPath, err := filepath.Rel(s.config.RootDir, filePath)
+	relPath, err := filepath.Rel(rt.dir, filePath)
 	if err != nil {
 		relPath = filepath.Base(filePath)
 	}
@@ -87,14 +87,14 @@ type DirectoryEntry struct {
 }
 
 // handleIndex generates a directory index page
-func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, dirPath string) {
-	if s.isHiddenPath(dirPath) {
+func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, rt *root, dirPath string) {
+	if rt.isHiddenPath(dirPath) {
 		http.NotFound(w, r)
 		return
 	}
-	log.Printf("dir: %s", s.relPath(dirPath))
-	if s.liveReload != nil {
-		s.liveReload.EnsureWatching(dirPath)
+	log.Printf("dir: %s", rt.relPath(dirPath))
+	if rt.liveReload != nil {
+		rt.liveReload.EnsureWatching(dirPath)
 	}
 	// Read directory entries
 	entries, err := os.ReadDir(dirPath)
@@ -104,7 +104,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, dirPath str
 	}
 
 	// Calculate relative path from root directory for breadcrumbs
-	relPath, err := filepath.Rel(s.config.RootDir, dirPath)
+	relPath, err := filepath.Rel(rt.dir, dirPath)
 	if err != nil {
 		relPath = "."
 	}
@@ -120,9 +120,9 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, dirPath str
 	if err != nil {
 		absDirPath = dirPath
 	}
-	absRootDir, err := filepath.Abs(s.config.RootDir)
+	absRootDir, err := filepath.Abs(rt.dir)
 	if err != nil {
-		absRootDir = s.config.RootDir
+		absRootDir = rt.dir
 	}
 	isAtRoot := absDirPath == absRootDir
 
@@ -139,7 +139,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, dirPath str
 		}
 
 		entryPath := filepath.Join(dirPath, entry.Name())
-		relEntryPath, err := filepath.Rel(s.config.RootDir, entryPath)
+		relEntryPath, err := filepath.Rel(rt.dir, entryPath)
 		if err != nil {
 			continue
 		}
@@ -168,7 +168,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request, dirPath str
 	if !isAtRoot {
 		// Calculate parent directory path
 		parentDir := filepath.Dir(dirPath)
-		relParentPath, err := filepath.Rel(s.config.RootDir, parentDir)
+		relParentPath, err := filepath.Rel(rt.dir, parentDir)
 		if err == nil {
 			// Build URL path for parent directory using same logic as regular entries
 			relSlash := filepath.ToSlash(relParentPath)
@@ -242,12 +242,13 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		{Href: "/settings", Text: "Settings"},
 	}
 
+	rt := s.rootFor(r)
 	var watchedDirs []WatchedDir
-	liveReloadEnabled := s.liveReload != nil
+	liveReloadEnabled := rt.liveReload != nil
 
 	if liveReloadEnabled {
-		absRoot, _ := filepath.Abs(s.config.RootDir)
-		for _, dir := range s.liveReload.WatchedDirs() {
+		absRoot, _ := filepath.Abs(rt.dir)
+		for _, dir := range rt.liveReload.WatchedDirs() {
 			rel, err := filepath.Rel(absRoot, dir)
 			if err != nil {
 				rel = dir
@@ -318,14 +319,15 @@ func (s *Server) handleRemoveWatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Reject removal of root directory
-	absRoot, _ := filepath.Abs(s.config.RootDir)
+	rt := s.rootFor(r)
+	absRoot, _ := filepath.Abs(rt.dir)
 	if dir == absRoot {
 		http.Error(w, "Cannot remove root directory watcher", http.StatusBadRequest)
 		return
 	}
 
-	if s.liveReload != nil {
-		if err := s.liveReload.RemoveWatch(dir); err != nil {
+	if rt.liveReload != nil {
+		if err := rt.liveReload.RemoveWatch(dir); err != nil {
 			log.Printf("Failed to remove watch on %s: %v", dir, err)
 		}
 	}

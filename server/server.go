@@ -7,11 +7,9 @@ import (
 	"fmt"
 	"html"
 	"io"
-	"io/fs"
 	"log"
 	"net"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -44,7 +42,7 @@ type Config struct {
 type Server struct {
 	config     Config
 	mux        *http.ServeMux
-	liveReload *LiveReload
+	roots      []*root
 	httpServer *http.Server
 	templates  templates
 
@@ -55,8 +53,15 @@ type Server struct {
 	stopOnce sync.Once
 }
 
-// NewServer creates a new server instance
+// NewServer creates a new server instance serving config.RootDir as its only root.
 func NewServer(config Config) *Server {
+	return newServer(config, config.RootDir)
+}
+
+// newServer creates a server with one root per directory. Production passes
+// one; tests pass several to check that roots stay apart. The first root is
+// the one whose removal shuts the server down.
+func newServer(config Config, dirs ...string) *Server {
 	s := &Server{
 		config:       config,
 		mux:          http.NewServeMux(),
@@ -68,24 +73,53 @@ func NewServer(config Config) *Server {
 		Handler: noCache(s.requireRoot(s.mux)),
 	}
 
-	// Initialize LiveReload if enabled
-	if config.EnableLiveReload {
-		var err error
-		s.liveReload, err = newLiveReload(config.RootDir, config.Verbose)
-		if err != nil {
-			log.Printf("Failed to initialize LiveReload: %v", err)
-		} else {
-			s.liveReload.onRootRemoved = s.shutdownRootMissing
-			if err := s.liveReload.Start(); err != nil {
-				log.Printf("Failed to start LiveReload: %v", err)
-				s.liveReload = nil
-			}
+	for i, dir := range dirs {
+		var onRemoved func()
+		if i == 0 {
+			onRemoved = s.shutdownRootMissing
 		}
+		s.roots = append(s.roots, s.newRoot(dir, onRemoved))
 	}
 
-	s.templates = parseTemplates(s.liveReload != nil, config.Version)
+	s.templates = parseTemplates(s.hasLiveReload(), config.Version)
 	s.setupRoutes()
 	return s
+}
+
+// newRoot creates a root for dir with its own LiveReload when live reload is
+// enabled. onRemoved, if set, runs when dir itself is removed or renamed.
+func (s *Server) newRoot(dir string, onRemoved func()) *root {
+	rt := &root{dir: dir}
+	if !s.config.EnableLiveReload {
+		return rt
+	}
+	lr, err := newLiveReload(dir, s.config.Verbose)
+	if err != nil {
+		log.Printf("Failed to initialize LiveReload: %v", err)
+		return rt
+	}
+	lr.onRootRemoved = onRemoved
+	if err := lr.Start(); err != nil {
+		log.Printf("Failed to start LiveReload: %v", err)
+		return rt
+	}
+	rt.liveReload = lr
+	return rt
+}
+
+// hasLiveReload reports whether any root has live reload running.
+func (s *Server) hasLiveReload() bool {
+	for _, rt := range s.roots {
+		if rt.liveReload != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// rootFor returns the root that serves r. With one root that is the only root.
+func (s *Server) rootFor(r *http.Request) *root {
+	return s.roots[0]
 }
 
 // Start starts the HTTP server. It returns ErrRootMissing if the server shut
@@ -107,20 +141,12 @@ func (s *Server) Start() error {
 // and on SIGINT/SIGTERM.
 func (s *Server) Stop() {
 	s.stopOnce.Do(func() {
-		if s.liveReload != nil {
-			s.liveReload.Stop()
+		for _, rt := range s.roots {
+			if rt.liveReload != nil {
+				rt.liveReload.Stop()
+			}
 		}
 	})
-}
-
-// rootExists reports whether the root directory is still present. Errors
-// other than "not exist" (e.g. permissions) are treated as present.
-func (s *Server) rootExists() bool {
-	info, err := os.Stat(s.config.RootDir)
-	if err != nil {
-		return !errors.Is(err, fs.ErrNotExist)
-	}
-	return info.IsDir()
 }
 
 // noCache tells browsers not to cache any response, so a tab always shows the
@@ -169,17 +195,18 @@ func (w noCacheWriter) Unwrap() http.ResponseWriter {
 }
 
 // requireRoot answers every request with a shutdown notice once the root
-// directory is gone, then shuts the server down.
+// directory is gone, then shuts the server down. It watches roots[0] only,
+// which is the single root.
 func (s *Server) requireRoot(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.rootExists() {
+		if s.roots[0].exists() {
 			next.ServeHTTP(w, r)
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Connection", "close")
 		w.WriteHeader(http.StatusGone)
-		fmt.Fprintf(w, `<!DOCTYPE html><html><head><title>Folder Missing</title></head><body style="font-family: sans-serif; margin: 3em;"><h1>Folder missing</h1><p><code>%s</code> no longer exists. The server is shutting down.</p><p>You can close this tab.</p></body></html>`, html.EscapeString(s.config.RootDir))
+		fmt.Fprintf(w, `<!DOCTYPE html><html><head><title>Folder Missing</title></head><body style="font-family: sans-serif; margin: 3em;"><h1>Folder missing</h1><p><code>%s</code> no longer exists. The server is shutting down.</p><p>You can close this tab.</p></body></html>`, html.EscapeString(s.roots[0].dir))
 		s.shutdownRootMissing()
 	})
 }
@@ -216,8 +243,8 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("/_mdserver/files", s.handleFiles)
 
 	// LiveReload WebSocket endpoint
-	if s.liveReload != nil {
-		s.mux.HandleFunc("/livereload", s.liveReload.HandleWebSocket)
+	if lr := s.roots[0].liveReload; lr != nil {
+		s.mux.HandleFunc("/livereload", lr.HandleWebSocket)
 	}
 
 	// Settings routes
@@ -250,83 +277,38 @@ func (s *Server) servePickerJS(w http.ResponseWriter, r *http.Request) {
 
 // handleRequest serves paths under the root: directory listings, rendered Markdown and images.
 func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
-	requestPath := r.URL.Path
+	rt := s.rootFor(r)
+	path, kind, status := rt.resolve(r.URL.Path)
 
-	// Handle root path
-	if requestPath == "/" {
-		// Always serve directory index at root
-		s.handleIndex(w, r, s.config.RootDir)
+	switch status {
+	case http.StatusMovedPermanently:
+		// Ensure directory paths end with / for consistency
+		http.Redirect(w, r, r.URL.Path+"/", http.StatusMovedPermanently)
 		return
-	}
-
-	// Handle markdown file requests
-	// Remove leading slash
-	if len(requestPath) > 0 && requestPath[0] == '/' {
-		requestPath = requestPath[1:]
-	}
-
-	filePath := filepath.Join(s.config.RootDir, requestPath)
-
-	if s.isHiddenPath(filePath) {
+	case http.StatusForbidden:
+		http.Error(w, "Invalid path", http.StatusForbidden)
+		return
+	case http.StatusOK:
+	default:
 		http.NotFound(w, r)
 		return
 	}
 
-	// Check if path exists and is a directory
-	if info, err := os.Stat(filePath); err == nil && info.IsDir() {
-		// Ensure directory paths end with / for consistency
-		if !strings.HasSuffix(requestPath, "/") && !strings.HasSuffix(r.URL.Path, "/") {
-			http.Redirect(w, r, r.URL.Path+"/", http.StatusMovedPermanently)
-			return
-		}
-		s.handleIndex(w, r, filePath)
-		return
+	switch kind {
+	case kindDirectory:
+		s.handleIndex(w, r, rt, path)
+	case kindPage:
+		s.handleMarkdown(w, r, rt, path)
+	case kindImage:
+		s.serveImage(w, r, rt, path)
+	default:
+		http.NotFound(w, r)
 	}
-
-	// Check if it's a markdown file (has .md extension or no extension)
-	ext := filepath.Ext(filePath)
-	if isPageFile(filePath) {
-		if s.isValidPath(filePath) {
-			s.handleMarkdown(w, r, filePath)
-			return
-		}
-	} else if ext == "" {
-		// Try adding .md extension
-		filePathWithExt := filePath + ".md"
-		if s.isValidPath(filePathWithExt) {
-			s.handleMarkdown(w, r, filePathWithExt)
-			return
-		}
-	}
-
-	// Not Markdown: serve it if it's an allowlisted image
-	s.handleStaticFile(w, r, filePath)
 }
 
 // isPageFile reports whether a file name is one mdserver renders as a page.
 func isPageFile(name string) bool {
 	return strings.EqualFold(filepath.Ext(name), ".md")
-}
-
-// isValidPath checks if a file path is within the root directory (security)
-func (s *Server) isValidPath(filePath string) bool {
-	absPath, err := filepath.Abs(filePath)
-	if err != nil {
-		return false
-	}
-
-	absRoot, err := filepath.Abs(s.config.RootDir)
-	if err != nil {
-		return false
-	}
-
-	rel, err := filepath.Rel(absRoot, absPath)
-	if err != nil {
-		return false
-	}
-
-	// Prevent directory traversal
-	return rel != ".." && rel != "." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !hasDotSegment(rel)
 }
 
 // hasDotSegment reports whether any segment of a root-relative path starts with ".".
@@ -342,51 +324,11 @@ func hasDotSegment(rel string) bool {
 	return false
 }
 
-// isHiddenPath reports whether filePath is inside the root and has a dot segment
-// relative to the root. Paths outside the root are not hidden; isValidPath rejects them.
-func (s *Server) isHiddenPath(filePath string) bool {
-	absPath, err := filepath.Abs(filePath)
-	if err != nil {
-		return false
-	}
-	absRoot, err := filepath.Abs(s.config.RootDir)
-	if err != nil {
-		return false
-	}
-	rel, err := filepath.Rel(absRoot, absPath)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return false
-	}
-	return hasDotSegment(rel)
-}
+// serveImage serves an allowlisted image that root.resolve found under the root.
+func (s *Server) serveImage(w http.ResponseWriter, r *http.Request, rt *root, filePath string) {
+	contentType, _ := imageContentType(filepath.Ext(filePath))
 
-// handleStaticFile serves an allowlisted image from the root directory; anything else gets 404.
-func (s *Server) handleStaticFile(w http.ResponseWriter, r *http.Request, filePath string) {
-	if s.isHiddenPath(filePath) {
-		http.NotFound(w, r)
-		return
-	}
-
-	// Validate path is within root directory
-	if !s.isValidPath(filePath) {
-		http.Error(w, "Invalid path", http.StatusForbidden)
-		return
-	}
-
-	// Check if file exists
-	info, err := os.Stat(filePath)
-	if err != nil || info.IsDir() {
-		http.NotFound(w, r)
-		return
-	}
-
-	contentType, ok := imageContentType(filepath.Ext(filePath))
-	if !ok {
-		http.NotFound(w, r)
-		return
-	}
-
-	log.Printf("file: %s", s.relPath(filePath))
+	log.Printf("file: %s", rt.relPath(filePath))
 
 	w.Header().Set("Content-Type", contentType)
 	// An SVG opened directly is a document on mdserver's origin; keep its scripts and forms from
@@ -395,19 +337,6 @@ func (s *Server) handleStaticFile(w http.ResponseWriter, r *http.Request, filePa
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 
 	http.ServeFile(w, r, filePath)
-}
-
-// relPath returns a path relative to the root directory, or the original path if it's outside the root
-func (s *Server) relPath(path string) string {
-	rel, err := filepath.Rel(s.config.RootDir, path)
-	if err != nil {
-		return path
-	}
-	// If path is outside root directory, return original
-	if strings.HasPrefix(rel, "..") {
-		return path
-	}
-	return rel
 }
 
 // imageTypes lists the image extensions served from the root, with their MIME types.
