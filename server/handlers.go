@@ -283,11 +283,11 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	liveReloadEnabled := s.hasLiveReload()
 
 	if s.multi {
-		for _, rt := range s.roots {
+		for _, rt := range s.rootList() {
 			groups = append(groups, WatchedGroup{Name: rt.name, Dirs: rt.watchedDirs()})
 		}
 	} else {
-		watchedDirs = s.roots[0].watchedDirs()
+		watchedDirs = s.firstRoot().watchedDirs()
 	}
 
 	tmpl := s.templates.settings
@@ -350,7 +350,7 @@ func (s *Server) handleRemoveWatch(w http.ResponseWriter, r *http.Request) {
 
 	// Multi-root requests name the root whose watch is removed; a directory of
 	// another root is never touched.
-	rt := s.roots[0]
+	rt := s.firstRoot()
 	if s.multi {
 		if rt = s.rootNamed(r.FormValue("root")); rt == nil {
 			http.Error(w, "Unknown root", http.StatusBadRequest)

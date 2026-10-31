@@ -143,14 +143,14 @@ func TestMultiRootStaysUpWhenEveryRootVanishes(t *testing.T) {
 	}
 }
 
-func TestMultiRootStaysUnavailableAfterTheFolderReturns(t *testing.T) {
+func TestMultiRootRevivesOnRequestAfterTheFolderReturns(t *testing.T) {
 	srv, _, dirB := twoRoots(t, Config{})
 	os.RemoveAll(dirB)
 	if rec := get(t, srv, "/b/"); rec.Code != http.StatusGone {
 		t.Fatalf("GET /b/ = %d, want 410", rec.Code)
 	}
 	writeTestFile(t, filepath.Join(dirB, "x.md"), "# back\n")
-	if rec := get(t, srv, "/b/x.md"); rec.Code != http.StatusGone {
-		t.Errorf("GET /b/x.md after the folder returned = %d, want 410 until restart", rec.Code)
+	if rec := get(t, srv, "/b/x.md"); rec.Code != http.StatusOK {
+		t.Errorf("GET /b/x.md after the folder returned = %d, want 200", rec.Code)
 	}
 }

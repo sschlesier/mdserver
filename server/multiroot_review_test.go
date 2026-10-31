@@ -24,8 +24,8 @@ func TestMultiRootParentEntryCarriesPrefix(t *testing.T) {
 	}
 }
 
-// The watcher alone marks a vanished root unavailable: a folder removed and
-// put back before any request arrives stays unavailable until restart.
+// The watcher alone marks a vanished root unavailable; the next request under
+// it, once the folder is back, revives it.
 func TestMultiRootWatcherMarksRootUnavailable(t *testing.T) {
 	srv, _, dirB := twoRoots(t, Config{EnableLiveReload: true})
 	rtB := srv.rootNamed("b")
@@ -42,7 +42,7 @@ func TestMultiRootWatcherMarksRootUnavailable(t *testing.T) {
 	}
 
 	writeTestFile(t, dirB+"/x.md", "# back\n")
-	if rec := get(t, srv, "/b/x.md"); rec.Code != http.StatusGone {
-		t.Errorf("GET /b/x.md after the folder returned = %d, want 410", rec.Code)
+	if rec := get(t, srv, "/b/x.md"); rec.Code != http.StatusOK {
+		t.Errorf("GET /b/x.md after the folder returned = %d, want 200", rec.Code)
 	}
 }

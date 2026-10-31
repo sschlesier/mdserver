@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -45,7 +46,11 @@ type Config struct {
 type Server struct {
 	config     Config
 	mux        *http.ServeMux
+	// roots is replaced, never edited in place, under rootsMu; read it with
+	// rootList. A request works on the slice it took at its start.
+	rootsMu    sync.RWMutex
 	roots      []*root
+	stopped    bool
 	multi      bool
 	httpServer *http.Server
 	templates  templates
@@ -55,6 +60,17 @@ type Server struct {
 	shutdownDone chan struct{}
 
 	stopOnce sync.Once
+
+	// Live config reload (multi-root mode); see configwatch.go.
+	reloadMu     sync.Mutex
+	stateMu      sync.Mutex
+	reloadErr    string
+	portNotice   string
+	loggedErr    string
+	loggedNotice string
+	startPort    int
+	reloadCount  atomic.Int64
+	cfgWatch     *configWatcher
 }
 
 // NewServer creates a new server instance. With config.Roots set it serves each
@@ -87,7 +103,7 @@ func newServer(config Config, dirs ...string) *Server {
 func newMultiServer(config Config) *Server {
 	s := newBareServer(config, true)
 	for _, r := range config.Roots {
-		s.roots = append(s.roots, s.newRoot(r.Name, r.Dir, func(rt *root) { rt.gone.Store(true) }))
+		s.roots = append(s.roots, s.newMultiRoot(r.Name, r.Dir))
 	}
 	s.finish()
 	return s
@@ -141,9 +157,28 @@ func (s *Server) newRoot(name, dir string, onRemoved func(*root)) *root {
 	return rt
 }
 
+// rootList returns the current roots. The slice is never modified, so callers
+// may range over it without holding a lock.
+func (s *Server) rootList() []*root {
+	s.rootsMu.RLock()
+	defer s.rootsMu.RUnlock()
+	return s.roots
+}
+
+// firstRoot is the single root of single-root mode.
+func (s *Server) firstRoot() *root {
+	return s.rootList()[0]
+}
+
+// newMultiRoot creates a multi-root root that marks itself unavailable when
+// its directory is removed.
+func (s *Server) newMultiRoot(name, dir string) *root {
+	return s.newRoot(name, dir, func(rt *root) { rt.gone.Store(true) })
+}
+
 // hasLiveReload reports whether any root has live reload running.
 func (s *Server) hasLiveReload() bool {
-	for _, rt := range s.roots {
+	for _, rt := range s.rootList() {
 		if rt.liveReload != nil {
 			return true
 		}
@@ -157,7 +192,7 @@ func (s *Server) hasLiveReload() bool {
 // ok is false when no root has that name.
 func (s *Server) rootFor(r *http.Request) (rt *root, inner string, ok bool) {
 	if !s.multi {
-		return s.roots[0], r.URL.Path, true
+		return s.firstRoot(), r.URL.Path, true
 	}
 	seg, rest, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, "/"), "/")
 	rt = s.rootNamed(seg)
@@ -169,7 +204,7 @@ func (s *Server) rootFor(r *http.Request) (rt *root, inner string, ok bool) {
 
 // rootNamed returns the multi-root root called name, or nil.
 func (s *Server) rootNamed(name string) *root {
-	for _, rt := range s.roots {
+	for _, rt := range s.rootList() {
 		if rt.name == name {
 			return rt
 		}
@@ -196,7 +231,14 @@ func (s *Server) Start() error {
 // and on SIGINT/SIGTERM.
 func (s *Server) Stop() {
 	s.stopOnce.Do(func() {
-		for _, rt := range s.roots {
+		if s.cfgWatch != nil {
+			s.cfgWatch.stop()
+		}
+		s.rootsMu.Lock()
+		s.stopped = true
+		roots := s.roots
+		s.rootsMu.Unlock()
+		for _, rt := range roots {
 			if rt.liveReload != nil {
 				rt.liveReload.Stop()
 			}
@@ -254,14 +296,14 @@ func (w noCacheWriter) Unwrap() http.ResponseWriter {
 // which is the single root. Multi-root mode never shuts down this way.
 func (s *Server) requireRoot(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.multi || s.roots[0].exists() {
+		if s.multi || s.firstRoot().exists() {
 			next.ServeHTTP(w, r)
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Connection", "close")
 		w.WriteHeader(http.StatusGone)
-		fmt.Fprintf(w, `<!DOCTYPE html><html><head><title>Folder Missing</title></head><body style="font-family: sans-serif; margin: 3em;"><h1>Folder missing</h1><p><code>%s</code> no longer exists. The server is shutting down.</p><p>You can close this tab.</p></body></html>`, html.EscapeString(s.roots[0].dir))
+		fmt.Fprintf(w, `<!DOCTYPE html><html><head><title>Folder Missing</title></head><body style="font-family: sans-serif; margin: 3em;"><h1>Folder missing</h1><p><code>%s</code> no longer exists. The server is shutting down.</p><p>You can close this tab.</p></body></html>`, html.EscapeString(s.firstRoot().dir))
 		s.shutdownRootMissing()
 	})
 }
@@ -300,7 +342,7 @@ func (s *Server) setupRoutes() {
 	// LiveReload WebSocket endpoint
 	if s.multi {
 		s.mux.HandleFunc("/livereload", s.handleLiveReload)
-	} else if lr := s.roots[0].liveReload; lr != nil {
+	} else if lr := s.firstRoot().liveReload; lr != nil {
 		s.mux.HandleFunc("/livereload", lr.HandleWebSocket)
 	}
 
@@ -350,9 +392,12 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if s.multi && !rt.available() {
-		serveRootMissing(w, rt)
-		return
+	if s.multi {
+		var ok bool
+		if rt, ok = s.availableRoot(rt); !ok {
+			serveRootMissing(w, rt)
+			return
+		}
 	}
 	path, kind, status := rt.resolve(inner)
 

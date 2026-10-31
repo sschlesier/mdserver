@@ -86,13 +86,14 @@ func (s *Server) handleFiles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Multi-root requests name their root; single-root requests ignore the parameter.
-	rt := s.roots[0]
+	rt := s.firstRoot()
 	if s.multi {
 		if rt = s.rootNamed(r.URL.Query().Get("root")); rt == nil {
 			http.NotFound(w, r)
 			return
 		}
-		if !rt.available() {
+		var ok bool
+		if rt, ok = s.availableRoot(rt); !ok {
 			http.Error(w, "Folder missing", http.StatusGone)
 			return
 		}
