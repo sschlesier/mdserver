@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Add `--multi-root [config]` to serve several named roots from one port, each at `/<name>/`. The roots are read once at startup from a plain-text config file (`$XDG_CONFIG_HOME/mdserver/roots`, else `~/.config/mdserver/roots`, or the path given); each line is `<name> <path>`, with an optional `port <n>` line. `/` lists the roots
+- In multi-root mode root-relative Markdown links and images point inside their root, live reload, the file picker and remove-watch work per root, and a root whose folder disappears answers 410 while the others keep serving. Single-root mode (no `--multi-root`) is unchanged
+
 ## v3.1.0
 
 - Add a quick file picker: press Alt-O (or use the new header button) to fuzzy-search the Markdown pages and directories under the served root and jump to one

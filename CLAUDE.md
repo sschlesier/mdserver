@@ -32,7 +32,7 @@ Data:      Reads files under the served root; writes nothing to disk. Nothing se
 Staleness: A saved file should show in open tabs within about a second (live reload).
 
 Invariants:
-- No URL serves, renders or lists a file or directory outside the served root, except
+- No URL serves, renders or lists a file or directory outside the configured root, except
   through a symlink inside the root.
 - Dotfiles and dot-directories under the root are never served.
 - Only Markdown (.md, rendered) and image files (.png .jpg .jpeg .gif .svg .webp) under the
