@@ -24,10 +24,10 @@ func multiRootConflict(setFlags map[string]bool, render bool) string {
 	return ""
 }
 
-// listenPort picks the port: --port if given, else the config's port, else 0
-// for an automatically chosen free port.
-func listenPort(flagPort, configPort int) int {
-	if flagPort != 0 {
+// listenPort picks the port: --port if given (0 means choose a free port), else
+// the config's port, else 0 for an automatically chosen free port.
+func listenPort(flagPort int, flagGiven bool, configPort int) int {
+	if flagGiven {
 		return flagPort
 	}
 	return configPort
@@ -35,7 +35,7 @@ func listenPort(flagPort, configPort int) int {
 
 // runMultiRoot serves the roots named by the config file until interrupted.
 // Config problems are fatal and exit 1 before anything listens.
-func runMultiRoot(host string, flagPort int, liveReload, verbose, noOpen bool, configArg string) {
+func runMultiRoot(host string, flagPort int, flagPortGiven, liveReload, verbose, noOpen bool, configArg string) {
 	log.SetFlags(0)
 
 	path, err := server.ConfigPath(configArg)
@@ -49,7 +49,7 @@ func runMultiRoot(host string, flagPort int, liveReload, verbose, noOpen bool, c
 		os.Exit(1)
 	}
 
-	port := listenPort(flagPort, cfg.Port)
+	port := listenPort(flagPort, flagPortGiven, cfg.Port)
 	if port == 0 {
 		port = findAvailablePort(host)
 		if port == 0 {

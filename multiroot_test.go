@@ -36,15 +36,21 @@ func TestMultiRootConflict(t *testing.T) {
 }
 
 func TestListenPort(t *testing.T) {
-	tests := []struct{ flag, config, want int }{
-		{0, 0, 0},
-		{0, 8099, 8099},
-		{9000, 0, 9000},
-		{9000, 8099, 9000},
+	tests := []struct {
+		flag      int
+		flagGiven bool
+		config    int
+		want      int
+	}{
+		{0, false, 0, 0},
+		{0, false, 8099, 8099},
+		{9000, true, 0, 9000},
+		{9000, true, 8099, 9000},
+		{0, true, 8099, 0}, // an explicit --port 0 means a free port, not the config's
 	}
 	for _, tt := range tests {
-		if got := listenPort(tt.flag, tt.config); got != tt.want {
-			t.Errorf("listenPort(%d, %d) = %d, want %d", tt.flag, tt.config, got, tt.want)
+		if got := listenPort(tt.flag, tt.flagGiven, tt.config); got != tt.want {
+			t.Errorf("listenPort(%d, %v, %d) = %d, want %d", tt.flag, tt.flagGiven, tt.config, got, tt.want)
 		}
 	}
 }

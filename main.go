@@ -70,7 +70,7 @@ func main() {
 			flag.Usage()
 			os.Exit(2)
 		}
-		runMultiRoot(*host, *port, *livereload, *verbose, *noOpen, flag.Arg(0))
+		runMultiRoot(*host, *port, setFlags["port"], *livereload, *verbose, *noOpen, flag.Arg(0))
 		return
 	}
 
